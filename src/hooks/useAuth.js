@@ -26,18 +26,22 @@ export function useAuth() {
   }, [])
 
   async function loadProfile(userId) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
 
-    if (data) {
-      setProfile(data)
-      setNeedsDisplayName(false)
-    } else {
-      setNeedsDisplayName(true)
+      if (data) {
+        setProfile(data)
+        setNeedsDisplayName(false)
+        return
+      }
+
+      if (attempt < 2) await new Promise(r => setTimeout(r, 500))
     }
+    setNeedsDisplayName(true)
   }
 
   async function signInWithGoogle() {

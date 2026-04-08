@@ -3,7 +3,7 @@ import { getUserColorIndex, USER_COLORS } from '../hooks/usePresence'
 export default function UserDot({ userId, displayName, size = 24 }) {
   const colorIndex = getUserColorIndex(userId)
   const color = USER_COLORS[colorIndex]
-  const initial = (displayName || '?')[0].toUpperCase()
+  const initial = displayName?.[0]?.toUpperCase() ?? '·'
 
   return (
     <span

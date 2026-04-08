@@ -3,12 +3,19 @@ import { schedule, DAYS, STAGE_NAMES, STAGE_LOCATIONS, isSetActive, isSetUpcomin
 import UserDot from '../components/UserDot'
 import DotRow from '../components/DotRow'
 import StatusBottomSheet from '../components/StatusBottomSheet'
+import PillSheet from '../components/PillSheet'
 
-export default function ScheduleScreen({ myPresence, presenceMap, profiles, onSetStatus, onClear, currentUserId }) {
+export default function ScheduleScreen({ myPresence, presenceMap, profiles, onSetStatus, onClear, onSetBreak, onSaveHereAnnotation, currentUserId }) {
   const todayKey = getTodayKey()
   const [selectedDay, setSelectedDay] = useState(todayKey)
   const [sortBy, setSortBy] = useState('stage') // 'stage' | 'time'
   const [sheet, setSheet] = useState(null)
+  const [pillSheet, setPillSheet] = useState(null)
+
+  function handleOwnDotTap(row) {
+    const type = row.status === 'break' ? 'break' : row.status === 'here' ? 'here' : 'going'
+    setPillSheet(type)
+  }
 
   const daySchedule = useMemo(() => schedule[selectedDay] || [], [selectedDay])
 
@@ -116,6 +123,7 @@ export default function ScheduleScreen({ myPresence, presenceMap, profiles, onSe
               profiles={profiles}
               currentUserId={currentUserId}
               onTap={(set) => setSheet({ set: { ...set, stage: stageObj.stage }, day: selectedDay })}
+              onOwnDotTap={handleOwnDotTap}
             />
           ))
         ) : (
@@ -128,6 +136,7 @@ export default function ScheduleScreen({ myPresence, presenceMap, profiles, onSe
               profiles={profiles}
               currentUserId={currentUserId}
               onTap={() => setSheet({ set, day: selectedDay })}
+              onOwnDotTap={handleOwnDotTap}
             />
           ))
         )}
@@ -143,11 +152,23 @@ export default function ScheduleScreen({ myPresence, presenceMap, profiles, onSe
           onClose={() => setSheet(null)}
         />
       )}
+
+      {pillSheet && (
+        <PillSheet
+          type={pillSheet}
+          hereRow={myPresence.here}
+          goingRow={myPresence.going}
+          onSetBreak={onSetBreak}
+          onClear={onClear}
+          onSaveHereAnnotation={onSaveHereAnnotation}
+          onClose={() => setPillSheet(null)}
+        />
+      )}
     </div>
   )
 }
 
-function StageSection({ stageObj, day, presenceMap, profiles, currentUserId, onTap }) {
+function StageSection({ stageObj, day, presenceMap, profiles, currentUserId, onTap, onOwnDotTap }) {
   const loc = STAGE_LOCATIONS[stageObj.stage]
 
   function openMaps(e) {
@@ -206,13 +227,14 @@ function StageSection({ stageObj, day, presenceMap, profiles, currentUserId, onT
           profiles={profiles}
           currentUserId={currentUserId}
           onTap={() => onTap(set)}
+          onOwnDotTap={onOwnDotTap}
         />
       ))}
     </div>
   )
 }
 
-function SetRow({ set, stage, day, presenceMap, profiles, currentUserId, onTap }) {
+function SetRow({ set, stage, day, presenceMap, profiles, currentUserId, onTap, onOwnDotTap }) {
   const past = isSetPast(set, day)
   const active = isSetActive(set, day)
   const upcoming = isSetUpcoming(set, day)
@@ -262,12 +284,12 @@ function SetRow({ set, stage, day, presenceMap, profiles, currentUserId, onTap }
           <div style={{ fontSize: 11, color: '#22c55e', marginTop: 1 }}>Live now · ends {set.end}</div>
         )}
       </div>
-      <DotRow attendees={attendees} profiles={profiles} size={24} max={4} />
+      <DotRow attendees={attendees} profiles={profiles} size={24} max={4} currentUserId={currentUserId} onDotTap={onOwnDotTap} />
     </div>
   )
 }
 
-function FlatSetRow({ set, day, presenceMap, profiles, currentUserId, onTap }) {
+function FlatSetRow({ set, day, presenceMap, profiles, currentUserId, onTap, onOwnDotTap }) {
   const past = isSetPast(set, day)
   const active = isSetActive(set, day)
   const upcoming = isSetUpcoming(set, day)
@@ -322,7 +344,7 @@ function FlatSetRow({ set, day, presenceMap, profiles, currentUserId, onTap }) {
           {active ? `Live now · ${set.stage} · ends ${set.end}` : set.stage}
         </div>
       </div>
-      <DotRow attendees={attendees} profiles={profiles} size={24} max={4} />
+      <DotRow attendees={attendees} profiles={profiles} size={24} max={4} currentUserId={currentUserId} onDotTap={onOwnDotTap} />
     </div>
   )
 }

@@ -13,7 +13,7 @@ export default function App() {
   const [tab, setTab] = useState('now')
 
   const currentUserId = session?.user?.id || null
-  const { presenceMap, profiles, myPresence, setStatus, clearStatus, setBreak, saveHereAnnotation } = usePresence(currentUserId)
+  const { presenceMap, profiles, myPresence, setStatus, clearStatus, setBreak, saveHereAnnotation, refresh } = usePresence(currentUserId)
 
   if (loading) {
     return (
@@ -54,6 +54,7 @@ export default function App() {
     onClear: clearStatus,
     onSaveHereAnnotation: saveHereAnnotation,
     currentUserId,
+    onRefresh: refresh,
   }
 
   return (

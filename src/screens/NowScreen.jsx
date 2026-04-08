@@ -1,13 +1,18 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { schedule, DAYS, isSetActive, isSetUpcoming, getTodayKey } from '../data/schedule'
 import UserDot from '../components/UserDot'
 import DotRow from '../components/DotRow'
 import StatusBottomSheet from '../components/StatusBottomSheet'
+import PillSheet from '../components/PillSheet'
 
-export default function NowScreen({ myPresence, presenceMap, profiles, onSetStatus, onSetBreak, onClear, onSaveHereAnnotation, currentUserId }) {
+export default function NowScreen({ myPresence, presenceMap, profiles, onSetStatus, onSetBreak, onClear, onSaveHereAnnotation, currentUserId, onRefresh }) {
   const [sheet, setSheet] = useState(null)
   const [pillSheet, setPillSheet] = useState(null) // 'here' | 'going' | 'break'
   const [breakExpanded, setBreakExpanded] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [pullDistance, setPullDistance] = useState(0)
+  const scrollRef = useRef(null)
+  const touchStartY = useRef(null)
   const todayKey = getTodayKey()
 
   function getSlotRows(stage, artist, day, slot) {
@@ -52,8 +57,74 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
 
   const isEmpty = activeSets.length === 0 && upcomingSets.length === 0
 
+  // Pull-to-refresh handlers
+  function handleTouchStart(e) {
+    if (scrollRef.current?.scrollTop === 0) {
+      touchStartY.current = e.touches[0].clientY
+    } else {
+      touchStartY.current = null
+    }
+  }
+
+  function handleTouchMove(e) {
+    if (touchStartY.current === null || refreshing) return
+    const dist = e.touches[0].clientY - touchStartY.current
+    if (dist > 0) {
+      setPullDistance(Math.min(dist, 80))
+    } else {
+      setPullDistance(0)
+      touchStartY.current = null
+    }
+  }
+
+  async function handleTouchEnd() {
+    if (pullDistance >= 60 && !refreshing && onRefresh) {
+      setPullDistance(0)
+      setRefreshing(true)
+      try {
+        await onRefresh()
+      } finally {
+        setRefreshing(false)
+      }
+    } else {
+      setPullDistance(0)
+    }
+    touchStartY.current = null
+  }
+
+  function handleOwnDotTap(row) {
+    const type = row.status === 'break' ? 'break' : row.status === 'here' ? 'here' : 'going'
+    setPillSheet(type)
+  }
+
+  const showPullIndicator = refreshing || pullDistance > 20
+
   return (
-    <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 80 }}>
+    <div
+      ref={scrollRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      style={{ flex: 1, overflowY: 'auto', paddingBottom: 80, overscrollBehaviorY: 'contain' }}
+    >
+      {/* Pull-to-refresh indicator */}
+      {showPullIndicator && (
+        <div style={{
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          height: refreshing ? 44 : Math.min(pullDistance * 0.55, 44),
+          overflow: 'hidden',
+          color: '#8892a4', fontSize: 12, gap: 6,
+          transition: refreshing ? 'none' : 'height 0.05s',
+        }}>
+          {refreshing
+            ? <><SpinnerIcon /> Refreshing…</>
+            : pullDistance >= 60
+              ? '↑ Release to refresh'
+              : '↓ Pull to refresh'
+          }
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ padding: '16px 16px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ fontSize: 22, fontWeight: 800, color: '#eaeaea', letterSpacing: -0.5 }}>
@@ -95,7 +166,6 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
       {onBreak.length > 0 && (
         <section style={{ padding: '0 16px 8px' }}>
           {onBreak.length < 3 ? (
-            // Expanded by default when 1–2 people
             <>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: '#8892a4', textTransform: 'uppercase', marginBottom: 8 }}>
                 On Break
@@ -103,14 +173,13 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                 {onBreak.map(({ userId, row }) => (
                   <div key={userId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <UserDot userId={userId} displayName={profiles[userId]?.display_name || '?'} size={26} />
+                    <UserDot userId={userId} displayName={profiles[userId]?.display_name} size={26} />
                     {row.break_note && <span style={{ fontSize: 12, color: '#8892a4', fontStyle: 'italic' }}>"{row.break_note}"</span>}
                   </div>
                 ))}
               </div>
             </>
           ) : (
-            // Collapsible when 3+ people
             <>
               <button
                 onClick={() => setBreakExpanded(e => !e)}
@@ -129,7 +198,7 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                   {onBreak.map(({ userId, row }) => (
                     <div key={userId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <UserDot userId={userId} displayName={profiles[userId]?.display_name || '?'} size={26} />
+                      <UserDot userId={userId} displayName={profiles[userId]?.display_name} size={26} />
                       {row.break_note && <span style={{ fontSize: 12, color: '#8892a4', fontStyle: 'italic' }}>"{row.break_note}"</span>}
                     </div>
                   ))}
@@ -159,6 +228,8 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
               profiles={profiles}
               onTap={() => setSheet({ set, day: set.day })}
               variant="active"
+              currentUserId={currentUserId}
+              onOwnDotTap={handleOwnDotTap}
             />
           ))}
         </section>
@@ -175,6 +246,8 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
               profiles={profiles}
               onTap={() => setSheet({ set, day: set.day })}
               variant="upcoming"
+              currentUserId={currentUserId}
+              onOwnDotTap={handleOwnDotTap}
             />
           ))}
         </section>
@@ -206,228 +279,6 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
   )
 }
 
-const REACTIONS = [
-  { emoji: '💃', label: 'Dancing' },
-  { emoji: '😎', label: 'Vibing' },
-  { emoji: '❤️', label: 'Love it' },
-  { emoji: '😐', label: 'Meh' },
-]
-
-// Slide-up sheet opened by tapping a status pill
-function PillSheet({ type, hereRow, goingRow, onSetBreak, onClear, onSaveHereAnnotation, onClose }) {
-  const [breakNote, setBreakNote] = useState(type === 'break' ? (hereRow?.break_note || '') : '')
-  const [showBreakExpanded, setShowBreakExpanded] = useState(false)
-  // here annotation state — pre-populated from existing row (stored as comma-separated)
-  const [reactions, setReactions] = useState(
-    hereRow?.here_reaction ? hereRow.here_reaction.split(',').filter(Boolean) : []
-  )
-  const [hereNote, setHereNote] = useState(hereRow?.here_note || '')
-  const overlayRef = useRef(null)
-  const sheetRef = useRef(null)
-
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      if (sheetRef.current) sheetRef.current.style.transform = 'translateY(0)'
-    })
-  }, [])
-
-  function handleClose() {
-    if (sheetRef.current) {
-      sheetRef.current.style.transform = 'translateY(100%)'
-      setTimeout(onClose, 200)
-    } else {
-      onClose()
-    }
-  }
-
-  function handleOverlayClick(e) {
-    if (e.target === overlayRef.current) handleClose()
-  }
-
-  async function handleSaveAnnotation() {
-    await onSaveHereAnnotation({ reaction: reactions.join(','), note: hereNote })
-    handleClose()
-  }
-
-  async function handleGoOnBreak() {
-    await onSetBreak(breakNote)
-    handleClose()
-  }
-
-  async function handleUpdateBreak() {
-    await onSetBreak(breakNote)
-    handleClose()
-  }
-
-  async function handleClearHere() {
-    await onClear('here')
-    handleClose()
-  }
-
-  async function handleClearGoing() {
-    await onClear('going')
-    handleClose()
-  }
-
-  async function handleClearBreak() {
-    await onClear('break')
-    handleClose()
-  }
-
-  const row = type === 'going' ? goingRow : hereRow
-
-  return (
-    <div
-      ref={overlayRef}
-      onClick={handleOverlayClick}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-        zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-      }}
-    >
-      <div
-        ref={sheetRef}
-        style={{
-          width: '100%', maxWidth: 480, background: '#16213e',
-          borderRadius: '20px 20px 0 0',
-          padding: '0 0 env(safe-area-inset-bottom, 16px)',
-          transform: 'translateY(100%)',
-          transition: 'transform 0.22s ease-out',
-        }}
-      >
-        {/* Handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: '#ffffff30' }} />
-        </div>
-
-        {/* Header */}
-        <div style={{ padding: '12px 20px 14px' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#eaeaea', lineHeight: 1.2 }}>
-            {type === 'break' ? 'On break' : row?.artist}
-          </div>
-          {type !== 'break' && row?.stage && (
-            <div style={{ fontSize: 14, color: '#8892a4', marginTop: 4 }}>{row.stage}</div>
-          )}
-        </div>
-
-        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-          {/* HERE pill sheet — reaction + note + save, then divider, then break + clear */}
-          {type === 'here' && (
-            <>
-              {/* Reaction row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-                {REACTIONS.map(r => {
-                  const selected = reactions.includes(r.emoji)
-                  return (
-                    <button
-                      key={r.emoji}
-                      onClick={() => setReactions(prev => {
-                        if (prev.includes(r.emoji)) return prev.filter(e => e !== r.emoji)
-                        if (prev.length >= 2) return prev
-                        return [...prev, r.emoji]
-                      })}
-                      style={{
-                        flex: 1,
-                        padding: '10px 4px',
-                        fontSize: 22,
-                        background: selected ? '#1e3a5f' : '#0d1b38',
-                        border: selected ? '1.5px solid #3b82f6' : '1.5px solid rgba(255,255,255,0.08)',
-                        borderRadius: 10,
-                        cursor: 'pointer',
-                        transition: 'border-color 0.15s, background 0.15s',
-                      }}
-                    >
-                      {r.emoji}
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Note input */}
-              <input
-                value={hereNote}
-                onChange={e => setHereNote(e.target.value)}
-                placeholder="Where are you standing? (optional)"
-                maxLength={80}
-                style={noteInputStyle}
-                onKeyDown={e => { if (e.key === 'Enter') handleSaveAnnotation() }}
-              />
-
-              {/* Save button */}
-              <button onClick={handleSaveAnnotation} style={confirmBtnStyle('#1d4ed8', '#93c5fd')}>
-                Save
-              </button>
-
-              {/* Divider */}
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '2px 0' }} />
-
-              {/* Go on break */}
-              {!showBreakExpanded ? (
-                <button
-                  onClick={() => setShowBreakExpanded(true)}
-                  style={{ ...actionBtnStyle, background: '#78350f20', border: '1.5px solid #f59e0b60', color: '#fbbf24' }}
-                >
-                  <span style={{ fontSize: 18 }}>☕</span>
-                  Go on break
-                </button>
-              ) : (
-                <div style={{ border: '1.5px solid #f59e0b60', borderRadius: 12, overflow: 'hidden' }}>
-                  <div style={{ ...actionBtnStyle, background: '#92400e20', color: '#fbbf24', borderRadius: 0, cursor: 'default' }}>
-                    <span style={{ fontSize: 18 }}>☕</span>
-                    Go on break
-                  </div>
-                  <div style={{ padding: '8px 12px 12px', background: '#0f1f3d' }}>
-                    <input
-                      autoFocus
-                      value={breakNote}
-                      onChange={e => setBreakNote(e.target.value)}
-                      placeholder="Optional note (e.g. grabbing food, back at 3)"
-                      maxLength={80}
-                      style={noteInputStyle}
-                      onKeyDown={e => { if (e.key === 'Enter') handleGoOnBreak() }}
-                    />
-                    <button onClick={handleGoOnBreak} style={confirmBtnStyle('#92400e', '#fbbf24')}>
-                      Set Break Status
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <button onClick={handleClearHere} style={clearBtnStyle}>Clear status</button>
-            </>
-          )}
-
-          {/* GOING pill sheet */}
-          {type === 'going' && (
-            <button onClick={handleClearGoing} style={clearBtnStyle}>Clear status</button>
-          )}
-
-          {/* BREAK pill sheet */}
-          {type === 'break' && (
-            <>
-              <input
-                value={breakNote}
-                onChange={e => setBreakNote(e.target.value)}
-                placeholder="Optional note (e.g. grabbing food, back at 3)"
-                maxLength={80}
-                style={noteInputStyle}
-                onKeyDown={e => { if (e.key === 'Enter') handleUpdateBreak() }}
-              />
-              <button onClick={handleUpdateBreak} style={confirmBtnStyle('#92400e', '#fbbf24')}>
-                Update note
-              </button>
-              <button onClick={handleClearBreak} style={clearBtnStyle}>Clear break</button>
-            </>
-          )}
-        </div>
-
-        <div style={{ height: 16 }} />
-      </div>
-    </div>
-  )
-}
-
 function SectionHeader({ label }) {
   return (
     <div style={{
@@ -439,7 +290,7 @@ function SectionHeader({ label }) {
   )
 }
 
-function SetCard({ set, attendees, profiles, onTap, variant }) {
+function SetCard({ set, attendees, profiles, onTap, variant, currentUserId, onOwnDotTap }) {
   const borderColor = variant === 'active' ? '#22c55e' : '#3b82f6'
   return (
     <div
@@ -458,7 +309,7 @@ function SetCard({ set, attendees, profiles, onTap, variant }) {
           {set.stage} · {variant === 'active' ? `until ${set.end}` : `starts ${set.start}`}
         </div>
       </div>
-      <DotRow attendees={attendees} profiles={profiles} size={26} max={4} />
+      <DotRow attendees={attendees} profiles={profiles} size={26} max={4} currentUserId={currentUserId} onDotTap={onOwnDotTap} />
     </div>
   )
 }
@@ -469,6 +320,17 @@ function ChevronIcon({ rotated = false }) {
       strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
       style={{ flexShrink: 0, opacity: 0.6, transition: 'transform 0.2s', transform: rotated ? 'rotate(180deg)' : 'none' }}>
       <polyline points="6 9 12 15 18 9" />
+    </svg>
+  )
+}
+
+function SpinnerIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+      strokeLinecap="round" strokeLinejoin="round"
+      style={{ animation: 'spin 0.8s linear infinite' }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
     </svg>
   )
 }
@@ -485,32 +347,4 @@ function pillBtnStyle(bg, color) {
 
 const pillTextStyle = {
   flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-}
-
-const actionBtnStyle = {
-  display: 'flex', alignItems: 'center', gap: 12,
-  width: '100%', padding: '14px 16px', borderRadius: 12,
-  fontSize: 16, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
-}
-
-const clearBtnStyle = {
-  background: 'transparent', border: 'none',
-  color: '#8892a4', fontSize: 13, padding: '6px 0',
-  cursor: 'pointer', textDecoration: 'underline',
-  textAlign: 'center', width: '100%',
-}
-
-const noteInputStyle = {
-  width: '100%', background: '#16213e',
-  border: '1px solid #ffffff20', borderRadius: 8,
-  padding: '10px 12px', color: '#eaeaea', fontSize: 14, outline: 'none',
-  marginBottom: 8, display: 'block',
-}
-
-function confirmBtnStyle(bg, color) {
-  return {
-    width: '100%', padding: '11px', background: bg,
-    border: 'none', borderRadius: 8, color,
-    fontWeight: 600, fontSize: 14, cursor: 'pointer',
-  }
 }

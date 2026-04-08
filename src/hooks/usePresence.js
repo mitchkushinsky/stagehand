@@ -44,16 +44,19 @@ export function usePresence(currentUserId) {
   const [profiles, setProfiles] = useState({})
   const channelRef = useRef(null)
 
+  const loadProfiles = useCallback(async () => {
+    const { data } = await supabase.from('profiles').select('*')
+    if (data) {
+      const map = {}
+      data.forEach(p => { map[p.id] = p })
+      setProfiles(map)
+    }
+  }, [])
+
   // Load all profiles once
   useEffect(() => {
-    supabase.from('profiles').select('*').then(({ data }) => {
-      if (data) {
-        const map = {}
-        data.forEach(p => { map[p.id] = p })
-        setProfiles(map)
-      }
-    })
-  }, [])
+    loadProfiles()
+  }, [loadProfiles])
 
   // Load all presence rows
   const loadPresence = useCallback(async () => {
@@ -242,6 +245,10 @@ export function usePresence(currentUserId) {
     return results
   }, [presenceMap])
 
+  const refresh = useCallback(async () => {
+    await Promise.all([loadPresence(), loadProfiles()])
+  }, [loadPresence, loadProfiles])
+
   return {
     presenceMap,
     profiles,
@@ -252,5 +259,6 @@ export function usePresence(currentUserId) {
     saveHereAnnotation,
     getSetPresence,
     getUserColor: (userId) => USER_COLORS[getUserColorIndex(userId)],
+    refresh,
   }
 }
