@@ -5,29 +5,38 @@ import { isSetActive, isSetPast } from '../data/schedule'
 export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, onSetBreak, onClear, onClose }) {
   const [breakNote, setBreakNote] = useState('')
   const [showBreakInput, setShowBreakInput] = useState(false)
+  // 'confirming' tracks which button is in the two-tap confirm state: 'here' | 'going' | null
+  const [confirming, setConfirming] = useState(null)
   const overlayRef = useRef(null)
   const sheetRef = useRef(null)
 
   const active = isSetActive(set, day)
   const past = isSetPast(set, day)
-  const canGo = !active && !past
+  // For button visibility: active → Here only, future → Going only, past → neither
+  const showHere = active
+  const showGoing = !active && !past
 
   const hereRow = myPresence?.here
   const goingRow = myPresence?.going
 
-  const isMyHereSet = hereRow &&
+  const isMyHereSet = hereRow?.status === 'here' &&
     hereRow.artist === set.artist &&
     hereRow.stage === set.stage &&
-    hereRow.day === day &&
-    hereRow.status === 'here'
+    hereRow.day === day
 
   const isMyGoingSet = goingRow &&
     goingRow.artist === set.artist &&
     goingRow.stage === set.stage &&
     goingRow.day === day
 
-  const replacingHere = hereRow && !isMyHereSet && hereRow.status === 'here'
-  const replacingGoing = goingRow && !isMyGoingSet
+  // Would tapping "Here" replace an existing here row at a different set?
+  const hereWouldReplace = hereRow?.status === 'here' && !isMyHereSet
+  // Would tapping "Going" replace an existing going row at a different set?
+  const goingWouldReplace = goingRow && !isMyGoingSet
+
+  // Any status connected to this set (for the bottom Clear link)
+  const hasHereForSet = isMyHereSet
+  const hasGoingForSet = isMyGoingSet
 
   // Slide in animation
   useEffect(() => {
@@ -49,12 +58,37 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
     if (e.target === overlayRef.current) handleClose()
   }
 
-  async function handleHere() {
+  function handleHereTap() {
+    if (isMyHereSet) {
+      // Already set here — tapping again is a no-op (clear link handles removal)
+      return
+    }
+    if (hereWouldReplace && confirming !== 'here') {
+      setConfirming('here')
+      return
+    }
+    commitHere()
+  }
+
+  async function commitHere() {
+    setConfirming(null)
     await onSetStatus({ status: 'here' })
     handleClose()
   }
 
-  async function handleGoing() {
+  function handleGoingTap() {
+    if (isMyGoingSet) {
+      return
+    }
+    if (goingWouldReplace && confirming !== 'going') {
+      setConfirming('going')
+      return
+    }
+    commitGoing()
+  }
+
+  async function commitGoing() {
+    setConfirming(null)
     await onSetStatus({ status: 'going' })
     handleClose()
   }
@@ -74,6 +108,13 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
     handleClose()
   }
 
+  // Tapping outside a confirming button cancels the confirm state
+  function handleSheetClick(e) {
+    if (confirming && !e.target.closest('[data-confirm-btn]')) {
+      setConfirming(null)
+    }
+  }
+
   return (
     <div
       ref={overlayRef}
@@ -90,6 +131,7 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
     >
       <div
         ref={sheetRef}
+        onClick={handleSheetClick}
         style={{
           width: '100%',
           maxWidth: 480,
@@ -113,76 +155,69 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
           <div style={{ fontSize: 14, color: '#8892a4', marginTop: 4 }}>
             {set.stage} · {set.start}–{set.end}
           </div>
-
-          {/* Replacement warnings */}
-          {(replacingHere || replacingGoing) && (
-            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {replacingHere && (
-                <div style={warningStyle}>
-                  Replaces your Here at <strong>{hereRow.artist}</strong>
-                </div>
-              )}
-              {replacingGoing && (
-                <div style={warningStyle}>
-                  Replaces your Going for <strong>{goingRow.artist}</strong>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Buttons */}
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {/* I'm Here */}
-          <div>
+
+          {/* I'm Here — active sets only */}
+          {showHere && (
             <button
-              onClick={handleHere}
+              data-confirm-btn="here"
+              onClick={handleHereTap}
               style={{
                 ...btnStyle,
-                background: isMyHereSet ? '#16a34a' : '#15803d20',
-                border: '1.5px solid #22c55e60',
+                background: isMyHereSet ? '#16a34a'
+                  : confirming === 'here' ? '#14532d'
+                  : '#15803d20',
+                border: confirming === 'here' ? '1.5px solid #22c55e' : '1.5px solid #22c55e60',
                 color: '#22c55e',
                 outline: isMyHereSet ? '2px solid #22c55e' : 'none',
+                cursor: isMyHereSet ? 'default' : 'pointer',
               }}
             >
               <span style={{ fontSize: 18 }}>🟢</span>
-              {isMyHereSet ? "Here now ✓" : "I'm Here"}
+              <span>
+                {isMyHereSet
+                  ? "Here now ✓"
+                  : confirming === 'here'
+                  ? `Confirm — replaces ${hereRow.artist}`
+                  : "I'm Here"}
+              </span>
             </button>
-            {isMyHereSet && (
-              <button onClick={handleClearHere} style={clearLinkStyle}>
-                Clear
-              </button>
-            )}
-          </div>
-
-          {/* Going when it starts */}
-          {canGo && (
-            <div>
-              <button
-                onClick={handleGoing}
-                style={{
-                  ...btnStyle,
-                  background: isMyGoingSet ? '#1d4ed820' : '#1e40af20',
-                  border: '1.5px solid #3b82f660',
-                  color: '#60a5fa',
-                  outline: isMyGoingSet ? '2px solid #3b82f6' : 'none',
-                }}
-              >
-                <span style={{ fontSize: 18 }}>🔵</span>
-                {isMyGoingSet ? 'Going ✓' : 'Going when it starts'}
-              </button>
-              {isMyGoingSet && (
-                <button onClick={handleClearGoing} style={clearLinkStyle}>
-                  Clear
-                </button>
-              )}
-            </div>
           )}
 
-          {/* On Break */}
+          {/* Going when it starts — future sets only */}
+          {showGoing && (
+            <button
+              data-confirm-btn="going"
+              onClick={handleGoingTap}
+              style={{
+                ...btnStyle,
+                background: isMyGoingSet ? '#1d4ed820'
+                  : confirming === 'going' ? '#1e3a8a'
+                  : '#1e40af20',
+                border: confirming === 'going' ? '1.5px solid #3b82f6' : '1.5px solid #3b82f660',
+                color: '#60a5fa',
+                outline: isMyGoingSet ? '2px solid #3b82f6' : 'none',
+                cursor: isMyGoingSet ? 'default' : 'pointer',
+              }}
+            >
+              <span style={{ fontSize: 18 }}>🔵</span>
+              <span>
+                {isMyGoingSet
+                  ? "Going ✓"
+                  : confirming === 'going'
+                  ? `Confirm — replaces ${goingRow.artist}`
+                  : "Going when it starts"}
+              </span>
+            </button>
+          )}
+
+          {/* On Break — always shown */}
           {!showBreakInput ? (
             <button
-              onClick={() => setShowBreakInput(true)}
+              onClick={() => { setConfirming(null); setShowBreakInput(true) }}
               style={{
                 ...btnStyle,
                 background: '#78350f20',
@@ -244,6 +279,16 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
               </div>
             </div>
           )}
+
+          {/* Clear link — shown if user has any status for this specific set */}
+          {(hasHereForSet || hasGoingForSet) && (
+            <button
+              onClick={hasHereForSet ? handleClearHere : handleClearGoing}
+              style={clearLinkStyle}
+            >
+              Clear my status
+            </button>
+          )}
         </div>
 
         <div style={{ height: 16 }} />
@@ -263,25 +308,18 @@ const btnStyle = {
   fontWeight: 600,
   cursor: 'pointer',
   textAlign: 'left',
-  transition: 'opacity 0.1s',
+  transition: 'background 0.15s, border-color 0.15s',
 }
 
 const clearLinkStyle = {
   background: 'transparent',
   border: 'none',
   color: '#8892a4',
-  fontSize: 12,
-  padding: '4px 4px 0',
+  fontSize: 13,
+  padding: '4px 0 0',
   cursor: 'pointer',
   textDecoration: 'underline',
+  textAlign: 'center',
+  width: '100%',
   display: 'block',
-}
-
-const warningStyle = {
-  padding: '7px 11px',
-  background: '#f9731618',
-  border: '1px solid #f9731640',
-  borderRadius: 8,
-  fontSize: 13,
-  color: '#f97316',
 }
