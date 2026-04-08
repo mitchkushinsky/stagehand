@@ -73,7 +73,7 @@ export default function App() {
         flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 20 }}>🎷</span>
+          <img src="/icon-192.png" style={{ height: 28, width: 28, objectFit: 'contain', display: 'block' }} />
           <span style={{ fontSize: 17, fontWeight: 800, color: '#eaeaea', letterSpacing: -0.4 }}>
             StageHand
           </span>
