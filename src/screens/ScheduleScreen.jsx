@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { schedule, DAYS, STAGE_NAMES, isSetActive, isSetUpcoming, isSetPast, getTodayKey } from '../data/schedule'
+import { schedule, DAYS, STAGE_NAMES, STAGE_LOCATIONS, isSetActive, isSetUpcoming, isSetPast, getTodayKey, parseSetTime } from '../data/schedule'
 import UserDot from '../components/UserDot'
 import DotRow from '../components/DotRow'
 import StatusBottomSheet from '../components/StatusBottomSheet'
@@ -7,9 +7,28 @@ import StatusBottomSheet from '../components/StatusBottomSheet'
 export default function ScheduleScreen({ myPresence, presenceMap, profiles, onSetStatus, onClear, currentUserId }) {
   const todayKey = getTodayKey()
   const [selectedDay, setSelectedDay] = useState(todayKey)
+  const [sortBy, setSortBy] = useState('stage') // 'stage' | 'time'
   const [sheet, setSheet] = useState(null)
 
   const daySchedule = useMemo(() => schedule[selectedDay] || [], [selectedDay])
+
+  // Flat time-sorted list for "By Time" view
+  const flatSets = useMemo(() => {
+    if (sortBy !== 'time') return []
+    const all = []
+    daySchedule.forEach(stageObj => {
+      stageObj.sets.forEach(set => {
+        all.push({ ...set, stage: stageObj.stage })
+      })
+    })
+    all.sort((a, b) => {
+      const tA = parseSetTime(a.start, selectedDay).getTime()
+      const tB = parseSetTime(b.start, selectedDay).getTime()
+      if (tA !== tB) return tA - tB
+      return a.stage.localeCompare(b.stage)
+    })
+    return all
+  }, [daySchedule, sortBy, selectedDay])
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -47,19 +66,71 @@ export default function ScheduleScreen({ myPresence, presenceMap, profiles, onSe
         })}
       </div>
 
+      {/* Sort toggle */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        padding: '10px 16px',
+        background: '#0d1b38',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        flexShrink: 0,
+      }}>
+        <div style={{
+          display: 'inline-flex',
+          background: '#0a1428',
+          borderRadius: 20,
+          padding: 3,
+          gap: 2,
+        }}>
+          {[['stage', 'By Stage'], ['time', 'By Time']].map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setSortBy(val)}
+              style={{
+                padding: '5px 16px',
+                borderRadius: 16,
+                border: 'none',
+                fontSize: 13,
+                fontWeight: sortBy === val ? 700 : 400,
+                background: sortBy === val ? '#1d4ed8' : 'transparent',
+                color: sortBy === val ? '#fff' : '#8892a4',
+                cursor: 'pointer',
+                transition: 'background 0.15s, color 0.15s',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Schedule list */}
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 80 }}>
-        {daySchedule.map(stageObj => (
-          <StageSection
-            key={stageObj.stage}
-            stageObj={stageObj}
-            day={selectedDay}
-            presenceMap={presenceMap}
-            profiles={profiles}
-            currentUserId={currentUserId}
-            onTap={(set) => setSheet({ set: { ...set, stage: stageObj.stage }, day: selectedDay })}
-          />
-        ))}
+        {sortBy === 'stage' ? (
+          daySchedule.map(stageObj => (
+            <StageSection
+              key={stageObj.stage}
+              stageObj={stageObj}
+              day={selectedDay}
+              presenceMap={presenceMap}
+              profiles={profiles}
+              currentUserId={currentUserId}
+              onTap={(set) => setSheet({ set: { ...set, stage: stageObj.stage }, day: selectedDay })}
+            />
+          ))
+        ) : (
+          flatSets.map((set, i) => (
+            <FlatSetRow
+              key={i}
+              set={set}
+              day={selectedDay}
+              presenceMap={presenceMap}
+              profiles={profiles}
+              currentUserId={currentUserId}
+              onTap={() => setSheet({ set, day: selectedDay })}
+            />
+          ))
+        )}
       </div>
 
       {sheet && (
@@ -77,22 +148,53 @@ export default function ScheduleScreen({ myPresence, presenceMap, profiles, onSe
 }
 
 function StageSection({ stageObj, day, presenceMap, profiles, currentUserId, onTap }) {
-  const fullName = STAGE_NAMES[stageObj.stage] || stageObj.stage
+  const loc = STAGE_LOCATIONS[stageObj.stage]
+
+  function openMaps(e) {
+    e.stopPropagation()
+    if (loc) {
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`, '_blank', 'noopener')
+    }
+  }
+
   return (
     <div style={{ marginBottom: 4 }}>
       <div style={{
         padding: '12px 16px 6px',
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: 1,
-        color: '#8892a4',
-        textTransform: 'uppercase',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         position: 'sticky',
         top: 0,
         background: '#1a1a2e',
         zIndex: 10,
       }}>
-        {stageObj.stage}
+        <span style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 1,
+          color: '#8892a4',
+          textTransform: 'uppercase',
+        }}>
+          {stageObj.stage}
+        </span>
+        {loc && (
+          <button
+            onClick={openMaps}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '2px 4px',
+              cursor: 'pointer',
+              fontSize: 14,
+              lineHeight: 1,
+              opacity: 0.7,
+            }}
+            aria-label={`Directions to ${stageObj.stage}`}
+          >
+            📍
+          </button>
+        )}
       </div>
       {stageObj.sets.map((set, i) => (
         <SetRow
@@ -115,7 +217,6 @@ function SetRow({ set, stage, day, presenceMap, profiles, currentUserId, onTap }
   const active = isSetActive(set, day)
   const upcoming = isSetUpcoming(set, day)
 
-  // Collect both 'here' and 'going' rows for this set
   const attendees = Object.values(presenceMap).flatMap(u =>
     [u.here, u.going].filter(r => r && r.stage === stage && r.artist === set.artist && r.day === day)
   )
@@ -136,7 +237,6 @@ function SetRow({ set, stage, day, presenceMap, profiles, currentUserId, onTap }
         cursor: past ? 'default' : 'pointer',
         gap: 12,
         transition: 'background 0.1s',
-        marginLeft: 0,
       }}
     >
       <div style={{
@@ -161,6 +261,66 @@ function SetRow({ set, stage, day, presenceMap, profiles, currentUserId, onTap }
         {active && (
           <div style={{ fontSize: 11, color: '#22c55e', marginTop: 1 }}>Live now · ends {set.end}</div>
         )}
+      </div>
+      <DotRow attendees={attendees} profiles={profiles} size={24} max={4} />
+    </div>
+  )
+}
+
+function FlatSetRow({ set, day, presenceMap, profiles, currentUserId, onTap }) {
+  const past = isSetPast(set, day)
+  const active = isSetActive(set, day)
+  const upcoming = isSetUpcoming(set, day)
+
+  const attendees = Object.values(presenceMap).flatMap(u =>
+    [u.here, u.going].filter(r => r && r.stage === set.stage && r.artist === set.artist && r.day === day)
+  )
+
+  let leftBorderColor = 'transparent'
+  if (active) leftBorderColor = '#22c55e'
+  else if (upcoming) leftBorderColor = '#3b82f6'
+
+  return (
+    <div
+      onClick={past ? undefined : onTap}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '10px 16px 10px 14px',
+        borderLeft: `3px solid ${leftBorderColor}`,
+        opacity: past ? 0.4 : 1,
+        cursor: past ? 'default' : 'pointer',
+        gap: 12,
+        transition: 'background 0.1s',
+      }}
+    >
+      <div style={{
+        fontSize: 12,
+        color: '#8892a4',
+        width: 62,
+        flexShrink: 0,
+        fontVariantNumeric: 'tabular-nums',
+      }}>
+        {set.start}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 14,
+          fontWeight: active ? 700 : 500,
+          color: active ? '#eaeaea' : past ? '#eaeaea' : '#d1d5db',
+          lineHeight: 1.3,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {set.artist}
+        </div>
+        <div style={{
+          fontSize: 11,
+          color: active ? '#22c55e' : '#8892a4',
+          marginTop: 1,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {active ? `Live now · ${set.stage} · ends ${set.end}` : set.stage}
+        </div>
       </div>
       <DotRow attendees={attendees} profiles={profiles} size={24} max={4} />
     </div>

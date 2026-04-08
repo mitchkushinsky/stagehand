@@ -1,3 +1,25 @@
+export const STAGE_LOCATIONS = {
+  'Abita Beer':        { lat: 29.9536, lng: -90.0669, address: 'Berger Great Lawn, Woldenberg Park, New Orleans' },
+  'NewOrleans.com':    { lat: 29.9577, lng: -90.0631, address: 'Jackson Square, New Orleans' },
+  'Hand Grenade':      { lat: 29.9581, lng: -90.0657, address: '721 Bourbon St, New Orleans' },
+  "Jack Daniel's":     { lat: 29.9621, lng: -90.0601, address: 'Goldring Woldenberg Riverfront Park, Governor Nicholls Wharf' },
+  'Willow Dispensary': { lat: 29.9572, lng: -90.0645, address: 'Bourbon St, New Orleans' },
+  'Loyola Esplanade':  { lat: 29.9626, lng: -90.0590, address: 'New Orleans Jazz Museum, 400 Esplanade Ave' },
+  'Fish Fry':          { lat: 29.9527, lng: -90.0672, address: 'Riverfront at Audubon Aquarium, New Orleans' },
+  'Songwriter':        { lat: 29.9626, lng: -90.0590, address: 'New Orleans Jazz Museum, 400 Esplanade Ave' },
+  'Pan-American Life': { lat: 29.9621, lng: -90.0601, address: 'Goldring Woldenberg Riverfront Park, Governor Nicholls Wharf' },
+  'Jazz Playhouse':    { lat: 29.9572, lng: -90.0651, address: 'Royal Sonesta New Orleans, 300 Bourbon St' },
+  'French Market Jazz':{ lat: 29.9580, lng: -90.0614, address: 'French Market, New Orleans' },
+  'Dutch Alley':       { lat: 29.9585, lng: -90.0608, address: 'Dutch Alley, French Market, New Orleans' },
+  'Voodoo Garden':     { lat: 29.9554, lng: -90.0628, address: 'House of Blues, 225 Decatur St' },
+  "Jazz Nat'l Park":   { lat: 29.9626, lng: -90.0590, address: 'New Orleans Jazz Museum at the Mint, 400 Esplanade Ave' },
+  'Schoolhouse':       { lat: 29.9580, lng: -90.0620, address: 'French Quarter, New Orleans' },
+  'Hancock Whitney':   { lat: 29.9577, lng: -90.0625, address: 'Jackson Square area, New Orleans' },
+  'Omni Royal Orleans':{ lat: 29.9574, lng: -90.0640, address: 'Omni Royal Orleans, 621 St Louis St' },
+  'KREWE Eyewear':     { lat: 29.9579, lng: -90.0635, address: 'Royal St, New Orleans' },
+  'Cafe Beignet':      { lat: 29.9579, lng: -90.0638, address: 'Cafe Beignet, 334 Royal St' },
+}
+
 export const STAGE_NAMES = {
   'Abita Beer': 'Abita Beer Stage',
   'NewOrleans.com': 'NewOrleans.com Stage',
