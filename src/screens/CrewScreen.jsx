@@ -3,13 +3,6 @@ import UserDot from '../components/UserDot'
 import StatusBottomSheet from '../components/StatusBottomSheet'
 import { schedule } from '../data/schedule'
 
-const REACTIONS = [
-  { emoji: '🕺', label: 'Dancing' },
-  { emoji: '🎵', label: 'Vibing' },
-  { emoji: '❤️', label: 'Loving it' },
-  { emoji: '😐', label: 'Meh' },
-  { emoji: '📍', label: 'Up front' },
-]
 
 // Sort priority based on primary (here) slot
 function primarySortKey(userPresence) {
@@ -136,14 +129,11 @@ function CrewCard({ userId, profile, userPresence, isMe, onTap }) {
             </div>
             {(hereRow.here_reaction || hereRow.here_note) && (
               <div style={{ marginTop: 4 }}>
-                {hereRow.here_reaction && (() => {
-                  const r = REACTIONS.find(r => r.emoji === hereRow.here_reaction)
-                  return (
-                    <div style={{ fontSize: 12, color: '#d1d5db' }}>
-                      {hereRow.here_reaction} {r?.label || ''}
-                    </div>
-                  )
-                })()}
+                {hereRow.here_reaction && (
+                  <div style={{ fontSize: 15 }}>
+                    {hereRow.here_reaction.split(',').filter(Boolean).join('')}
+                  </div>
+                )}
                 {hereRow.here_note && (
                   <div style={{ fontSize: 12, color: '#8892a4', fontStyle: 'italic', marginTop: hereRow.here_reaction ? 2 : 0 }}>
                     {hereRow.here_note}

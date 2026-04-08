@@ -208,18 +208,19 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
 
 const REACTIONS = [
   { emoji: '🕺', label: 'Dancing' },
-  { emoji: '🎵', label: 'Vibing' },
-  { emoji: '❤️', label: 'Loving it' },
+  { emoji: '😎', label: 'Vibing' },
+  { emoji: '❤️', label: 'Love it' },
   { emoji: '😐', label: 'Meh' },
-  { emoji: '📍', label: 'Up front' },
 ]
 
 // Slide-up sheet opened by tapping a status pill
 function PillSheet({ type, hereRow, goingRow, onSetBreak, onClear, onSaveHereAnnotation, onClose }) {
   const [breakNote, setBreakNote] = useState(type === 'break' ? (hereRow?.break_note || '') : '')
   const [showBreakExpanded, setShowBreakExpanded] = useState(false)
-  // here annotation state — pre-populated from existing row
-  const [reaction, setReaction] = useState(hereRow?.here_reaction || null)
+  // here annotation state — pre-populated from existing row (stored as comma-separated)
+  const [reactions, setReactions] = useState(
+    hereRow?.here_reaction ? hereRow.here_reaction.split(',').filter(Boolean) : []
+  )
   const [hereNote, setHereNote] = useState(hereRow?.here_note || '')
   const overlayRef = useRef(null)
   const sheetRef = useRef(null)
@@ -244,7 +245,7 @@ function PillSheet({ type, hereRow, goingRow, onSetBreak, onClear, onSaveHereAnn
   }
 
   async function handleSaveAnnotation() {
-    await onSaveHereAnnotation({ reaction, note: hereNote })
+    await onSaveHereAnnotation({ reaction: reactions.join(','), note: hereNote })
     handleClose()
   }
 
@@ -316,24 +317,31 @@ function PillSheet({ type, hereRow, goingRow, onSetBreak, onClear, onSaveHereAnn
             <>
               {/* Reaction row */}
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-                {REACTIONS.map(r => (
-                  <button
-                    key={r.emoji}
-                    onClick={() => setReaction(prev => prev === r.emoji ? null : r.emoji)}
-                    style={{
-                      flex: 1,
-                      padding: '10px 4px',
-                      fontSize: 22,
-                      background: reaction === r.emoji ? '#1e3a5f' : '#0d1b38',
-                      border: reaction === r.emoji ? '1.5px solid #3b82f6' : '1.5px solid rgba(255,255,255,0.08)',
-                      borderRadius: 10,
-                      cursor: 'pointer',
-                      transition: 'border-color 0.15s, background 0.15s',
-                    }}
-                  >
-                    {r.emoji}
-                  </button>
-                ))}
+                {REACTIONS.map(r => {
+                  const selected = reactions.includes(r.emoji)
+                  return (
+                    <button
+                      key={r.emoji}
+                      onClick={() => setReactions(prev => {
+                        if (prev.includes(r.emoji)) return prev.filter(e => e !== r.emoji)
+                        if (prev.length >= 2) return prev
+                        return [...prev, r.emoji]
+                      })}
+                      style={{
+                        flex: 1,
+                        padding: '10px 4px',
+                        fontSize: 22,
+                        background: selected ? '#1e3a5f' : '#0d1b38',
+                        border: selected ? '1.5px solid #3b82f6' : '1.5px solid rgba(255,255,255,0.08)',
+                        borderRadius: 10,
+                        cursor: 'pointer',
+                        transition: 'border-color 0.15s, background 0.15s',
+                      }}
+                    >
+                      {r.emoji}
+                    </button>
+                  )
+                })}
               </div>
 
               {/* Note input */}
