@@ -1,0 +1,18 @@
+{
+  "name": "StageHand",
+  "short_name": "StageHand",
+  "description": "Real-time crew tracker for French Quarter Festival 2026",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

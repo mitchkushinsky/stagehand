@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(npm create:*)",
+      "Bash(printf '\\\\n')",
+      "Bash(mv /Users/mitchellkushinsky/stagehand/temp-scaffold/* /Users/mitchellkushinsky/stagehand/)",
+      "Bash(mv /Users/mitchellkushinsky/stagehand/temp-scaffold/.gitignore /Users/mitchellkushinsky/stagehand/)",
+      "Bash(rmdir /Users/mitchellkushinsky/stagehand/temp-scaffold)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(git init:*)",
+      "Bash(git remote:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}
