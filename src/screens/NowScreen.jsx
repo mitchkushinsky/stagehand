@@ -1,11 +1,13 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { schedule, DAYS, isSetActive, isSetUpcoming, getTodayKey } from '../data/schedule'
 import UserDot from '../components/UserDot'
+import DotRow from '../components/DotRow'
 import StatusBottomSheet from '../components/StatusBottomSheet'
 
 export default function NowScreen({ myPresence, presenceMap, profiles, onSetStatus, onSetBreak, onClear, currentUserId }) {
   const [sheet, setSheet] = useState(null)
   const [pillSheet, setPillSheet] = useState(null) // 'here' | 'going' | 'break'
+  const [breakExpanded, setBreakExpanded] = useState(false)
   const todayKey = getTodayKey()
 
   function getSlotRows(stage, artist, day, slot) {
@@ -91,25 +93,50 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
 
       {/* On Break section */}
       {onBreak.length > 0 && (
-        <section style={{ padding: '0 16px 4px' }}>
-          <div style={{
-            fontSize: 11, fontWeight: 700, letterSpacing: 1.2,
-            color: '#8892a4', textTransform: 'uppercase', marginBottom: 8,
-          }}>
-            On Break
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-            {onBreak.map(({ userId, row }) => (
-              <div key={userId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <UserDot userId={userId} displayName={profiles[userId]?.display_name || '?'} size={26} />
-                {row.break_note && (
-                  <span style={{ fontSize: 12, color: '#8892a4', fontStyle: 'italic' }}>
-                    "{row.break_note}"
-                  </span>
-                )}
+        <section style={{ padding: '0 16px 8px' }}>
+          {onBreak.length < 3 ? (
+            // Expanded by default when 1–2 people
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: '#8892a4', textTransform: 'uppercase', marginBottom: 8 }}>
+                On Break
               </div>
-            ))}
-          </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {onBreak.map(({ userId, row }) => (
+                  <div key={userId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <UserDot userId={userId} displayName={profiles[userId]?.display_name || '?'} size={26} />
+                    {row.break_note && <span style={{ fontSize: 12, color: '#8892a4', fontStyle: 'italic' }}>"{row.break_note}"</span>}
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            // Collapsible when 3+ people
+            <>
+              <button
+                onClick={() => setBreakExpanded(e => !e)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  width: '100%', background: 'transparent', border: 'none',
+                  padding: '0 0 8px', cursor: 'pointer', color: '#8892a4',
+                }}
+              >
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+                  ☕ On break · {onBreak.length} people
+                </span>
+                <ChevronIcon rotated={breakExpanded} />
+              </button>
+              {breakExpanded && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                  {onBreak.map(({ userId, row }) => (
+                    <div key={userId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <UserDot userId={userId} displayName={profiles[userId]?.display_name || '?'} size={26} />
+                      {row.break_note && <span style={{ fontSize: 12, color: '#8892a4', fontStyle: 'italic' }}>"{row.break_note}"</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </section>
       )}
 
@@ -360,34 +387,27 @@ function SetCard({ set, attendees, profiles, onTap, variant }) {
       style={{
         margin: '0 12px 8px', background: '#16213e', borderRadius: 12,
         padding: '14px 16px', borderLeft: `3px solid ${borderColor}`,
-        cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 12,
+        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: '#eaeaea', lineHeight: 1.2, wordBreak: 'break-word' }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#eaeaea', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {set.artist}
         </div>
-        <div style={{ fontSize: 13, color: '#8892a4', marginTop: 3 }}>
+        <div style={{ fontSize: 13, color: '#8892a4', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {set.stage} · {variant === 'active' ? `until ${set.end}` : `starts ${set.start}`}
         </div>
       </div>
-      {attendees.length > 0 && (
-        <div style={{ display: 'flex', flexShrink: 0 }}>
-          {attendees.map((row, idx) => (
-            <div key={row.user_id} style={{ marginLeft: idx > 0 ? -6 : 0 }}>
-              <UserDot userId={row.user_id} displayName={profiles[row.user_id]?.display_name || '?'} size={26} />
-            </div>
-          ))}
-        </div>
-      )}
+      <DotRow attendees={attendees} profiles={profiles} size={26} max={4} />
     </div>
   )
 }
 
-function ChevronIcon() {
+function ChevronIcon({ rotated = false }) {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}>
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+      style={{ flexShrink: 0, opacity: 0.6, transition: 'transform 0.2s', transform: rotated ? 'rotate(180deg)' : 'none' }}>
       <polyline points="6 9 12 15 18 9" />
     </svg>
   )

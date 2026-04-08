@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { schedule, DAYS, STAGE_NAMES, isSetActive, isSetUpcoming, isSetPast, getTodayKey } from '../data/schedule'
 import UserDot from '../components/UserDot'
+import DotRow from '../components/DotRow'
 import StatusBottomSheet from '../components/StatusBottomSheet'
 
 export default function ScheduleScreen({ myPresence, presenceMap, profiles, onSetStatus, onClear, currentUserId }) {
@@ -153,7 +154,7 @@ function SetRow({ set, stage, day, presenceMap, profiles, currentUserId, onTap }
           fontWeight: active ? 700 : 500,
           color: active ? '#eaeaea' : past ? '#eaeaea' : '#d1d5db',
           lineHeight: 1.3,
-          wordBreak: 'break-word',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {set.artist}
         </div>
@@ -161,35 +162,7 @@ function SetRow({ set, stage, day, presenceMap, profiles, currentUserId, onTap }
           <div style={{ fontSize: 11, color: '#22c55e', marginTop: 1 }}>Live now · ends {set.end}</div>
         )}
       </div>
-      {attendees.length > 0 && (
-        <div style={{ display: 'flex', flexShrink: 0, gap: 2 }}>
-          {attendees.slice(0, 5).map((row, idx) => (
-            <div key={row.user_id} style={{ marginLeft: idx > 0 ? -6 : 0 }}>
-              <UserDot
-                userId={row.user_id}
-                displayName={profiles[row.user_id]?.display_name || '?'}
-                size={24}
-              />
-            </div>
-          ))}
-          {attendees.length > 5 && (
-            <div style={{
-              width: 24,
-              height: 24,
-              borderRadius: '50%',
-              background: '#ffffff20',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 10,
-              color: '#8892a4',
-              marginLeft: -6,
-            }}>
-              +{attendees.length - 5}
-            </div>
-          )}
-        </div>
-      )}
+      <DotRow attendees={attendees} profiles={profiles} size={24} max={4} />
     </div>
   )
 }
