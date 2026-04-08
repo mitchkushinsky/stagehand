@@ -1,36 +1,42 @@
 import { useMemo, useState } from 'react'
 import UserDot from '../components/UserDot'
 import StatusBottomSheet from '../components/StatusBottomSheet'
-import { schedule, isSetActive, isSetUpcoming } from '../data/schedule'
+import { schedule } from '../data/schedule'
 
-const STATUS_ORDER = { here: 0, going: 1, break: 2, none: 3 }
+// Sort priority based on primary (here) slot
+function primarySortKey(userPresence) {
+  if (!userPresence) return 3
+  const status = userPresence.here?.status
+  if (status === 'here') return 0
+  if (status === 'break') return 1
+  if (userPresence.going) return 2
+  return 3
+}
 
 export default function CrewScreen({ myPresence, presenceMap, profiles, onSetStatus, onSetBreak, onClear, currentUserId }) {
   const [sheet, setSheet] = useState(null)
 
   const crewList = useMemo(() => {
-    const allUsers = Object.keys(profiles)
-    return allUsers
-      .map(userId => {
-        const presence = presenceMap[userId] || null
-        const profile = profiles[userId]
-        const statusKey = presence ? presence.status : 'none'
-        return { userId, profile, presence, statusKey }
-      })
-      .sort((a, b) => (STATUS_ORDER[a.statusKey] ?? 3) - (STATUS_ORDER[b.statusKey] ?? 3))
+    return Object.keys(profiles)
+      .map(userId => ({
+        userId,
+        profile: profiles[userId],
+        userPresence: presenceMap[userId] || null,
+      }))
+      .sort((a, b) => primarySortKey(a.userPresence) - primarySortKey(b.userPresence))
   }, [profiles, presenceMap])
 
-  function handleCardTap(userId, presence) {
+  function handleCardTap(userId, userPresence) {
     if (userId !== currentUserId) return
-    if (!presence || presence.status === 'break' || !presence.artist) return
+    const hereRow = userPresence?.here
+    if (!hereRow || hereRow.status === 'break' || !hereRow.artist) return
 
-    // Find the set in schedule
-    const daySchedule = schedule[presence.day] || []
+    const daySchedule = schedule[hereRow.day] || []
     for (const stageObj of daySchedule) {
-      if (stageObj.stage !== presence.stage) continue
+      if (stageObj.stage !== hereRow.stage) continue
       for (const set of stageObj.sets) {
-        if (set.artist === presence.artist) {
-          setSheet({ set: { ...set, stage: stageObj.stage }, day: presence.day })
+        if (set.artist === hereRow.artist) {
+          setSheet({ set: { ...set, stage: stageObj.stage }, day: hereRow.day })
           return
         }
       }
@@ -47,15 +53,14 @@ export default function CrewScreen({ myPresence, presenceMap, profiles, onSetSta
       </div>
 
       <div style={{ padding: '0 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {crewList.map(({ userId, profile, presence, statusKey }) => (
+        {crewList.map(({ userId, profile, userPresence }) => (
           <CrewCard
             key={userId}
             userId={userId}
             profile={profile}
-            presence={presence}
-            statusKey={statusKey}
+            userPresence={userPresence}
             isMe={userId === currentUserId}
-            onTap={() => handleCardTap(userId, presence)}
+            onTap={() => handleCardTap(userId, userPresence)}
           />
         ))}
       </div>
@@ -75,16 +80,15 @@ export default function CrewScreen({ myPresence, presenceMap, profiles, onSetSta
   )
 }
 
-function CrewCard({ userId, profile, presence, statusKey, isMe, onTap }) {
-  const noStatus = statusKey === 'none'
-  const isBreak = statusKey === 'break'
+function CrewCard({ userId, profile, userPresence, isMe, onTap }) {
+  const hereRow = userPresence?.here || null
+  const goingRow = userPresence?.going || null
+  const hasAny = hereRow || goingRow
 
-  const statusDot = {
-    here: { color: '#22c55e', label: 'Here' },
-    going: { color: '#3b82f6', label: 'Going' },
-    break: { color: '#f59e0b', label: 'Break' },
-    none: { color: '#374151', label: '' },
-  }[statusKey]
+  // Border color driven by the 'here' slot
+  const borderColor = !hereRow ? (goingRow ? '#3b82f6' : '#374151')
+    : hereRow.status === 'here' ? '#22c55e'
+    : '#f59e0b' // break
 
   return (
     <div
@@ -94,16 +98,17 @@ function CrewCard({ userId, profile, presence, statusKey, isMe, onTap }) {
         borderRadius: 12,
         padding: '14px 16px',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: 14,
-        opacity: noStatus ? 0.6 : 1,
-        cursor: isMe && presence ? 'pointer' : 'default',
-        borderLeft: `3px solid ${statusDot.color}`,
+        opacity: hasAny ? 1 : 0.6,
+        cursor: isMe && hereRow && hereRow.status !== 'break' ? 'pointer' : 'default',
+        borderLeft: `3px solid ${borderColor}`,
       }}
     >
       <UserDot userId={userId} displayName={profile?.display_name} size={36} />
 
       <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Name row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: '#eaeaea' }}>
             {profile?.display_name || 'Unknown'}
@@ -115,49 +120,74 @@ function CrewCard({ userId, profile, presence, statusKey, isMe, onTap }) {
           )}
         </div>
 
-        {statusKey === 'here' && presence && (
-          <div>
-            <div style={{ fontSize: 13, color: '#d1d5db', marginTop: 1 }}>{presence.artist}</div>
+        {/* Here / Break status */}
+        {hereRow?.status === 'here' && (
+          <div style={{ marginTop: 3 }}>
+            <div style={{ fontSize: 13, color: '#d1d5db' }}>{hereRow.artist}</div>
             <div style={{ fontSize: 12, color: '#8892a4', marginTop: 1 }}>
-              {presence.stage} · until {presence.end_time}
+              {hereRow.stage} · until {hereRow.end_time}
+            </div>
+          </div>
+        )}
+        {hereRow?.status === 'break' && (
+          <div style={{ fontSize: 13, color: '#f59e0b', marginTop: 3 }}>
+            ☕ {hereRow.break_note ? `"${hereRow.break_note}"` : 'On break'}
+          </div>
+        )}
+
+        {/* Going status — shown below here/break if both exist */}
+        {goingRow && (
+          <div style={{
+            marginTop: hereRow ? 6 : 3,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+          }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
+            <div>
+              <span style={{ fontSize: 12, color: '#60a5fa' }}>Going to </span>
+              <span style={{ fontSize: 12, color: '#93c5fd', fontWeight: 600 }}>{goingRow.artist}</span>
+              <span style={{ fontSize: 12, color: '#60a5fa' }}> · {goingRow.start_time}</span>
             </div>
           </div>
         )}
 
-        {statusKey === 'going' && presence && (
-          <div>
-            <div style={{ fontSize: 13, color: '#d1d5db', marginTop: 1 }}>{presence.artist}</div>
-            <div style={{ fontSize: 12, color: '#8892a4', marginTop: 1 }}>
-              {presence.stage} · starts {presence.start_time}
-            </div>
-          </div>
-        )}
-
-        {statusKey === 'break' && (
-          <div style={{ fontSize: 13, color: '#f59e0b', marginTop: 1 }}>
-            {presence?.break_note ? `"${presence.break_note}"` : 'On break'}
-          </div>
-        )}
-
-        {statusKey === 'none' && (
-          <div style={{ fontSize: 13, color: '#8892a4', marginTop: 1 }}>No status set</div>
+        {/* No status at all */}
+        {!hereRow && !goingRow && (
+          <div style={{ fontSize: 13, color: '#8892a4', marginTop: 3 }}>No status set</div>
         )}
       </div>
 
-      {statusDot.label && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          fontSize: 12,
-          color: statusDot.color,
-          fontWeight: 600,
-          flexShrink: 0,
-        }}>
-          <div style={{ width: 7, height: 7, borderRadius: '50%', background: statusDot.color }} />
-          {statusDot.label}
+      {/* Status badge — only show the primary one */}
+      {hasAny && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+          {hereRow && (
+            <StatusBadge
+              color={hereRow.status === 'here' ? '#22c55e' : '#f59e0b'}
+              label={hereRow.status === 'here' ? 'Here' : 'Break'}
+            />
+          )}
+          {goingRow && !hereRow && (
+            <StatusBadge color="#3b82f6" label="Going" />
+          )}
         </div>
       )}
+    </div>
+  )
+}
+
+function StatusBadge({ color, label }) {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
+      fontSize: 12,
+      color,
+      fontWeight: 600,
+    }}>
+      <div style={{ width: 7, height: 7, borderRadius: '50%', background: color }} />
+      {label}
     </div>
   )
 }

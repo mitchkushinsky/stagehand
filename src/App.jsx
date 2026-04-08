@@ -45,17 +45,13 @@ export default function App() {
     })
   }
 
-  async function handleSetBreak(breakNote) {
-    await setBreak(breakNote)
-  }
-
   const sharedProps = {
     myPresence,
     presenceMap,
     profiles,
     onSetStatus: handleSetStatus,
-    onSetBreak: handleSetBreak,
-    onClear: clearStatus,
+    onSetBreak: setBreak,
+    onClear: clearStatus,  // clearStatus(status) — deletes one row by status
     currentUserId,
   }
 

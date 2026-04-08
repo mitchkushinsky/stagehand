@@ -4,16 +4,21 @@ import UserDot from '../components/UserDot'
 import StatusBottomSheet from '../components/StatusBottomSheet'
 
 export default function NowScreen({ myPresence, presenceMap, profiles, onSetStatus, onSetBreak, onClear, currentUserId }) {
-  const [sheet, setSheet] = useState(null) // { set, day }
+  const [sheet, setSheet] = useState(null)
   const todayKey = getTodayKey()
 
-  // Collect all active and upcoming sets across all days
+  // Helper: get rows for a set filtered by slot ('here' or 'going')
+  function getSlotRows(stage, artist, day, slot) {
+    return Object.values(presenceMap)
+      .map(u => u[slot])
+      .filter(r => r && r.stage === stage && r.artist === artist && r.day === day)
+  }
+
   const { activeSets, upcomingSets } = useMemo(() => {
     const active = []
     const upcoming = []
-    const allDays = Object.keys(DAYS)
 
-    allDays.forEach(day => {
+    Object.keys(DAYS).forEach(day => {
       const daySchedule = schedule[day] || []
       daySchedule.forEach(stageObj => {
         stageObj.sets.forEach(set => {
@@ -24,48 +29,48 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
       })
     })
 
-    // Get presence counts for sorting
-    const countFor = (s) => Object.values(presenceMap).filter(
-      r => r.stage === s.stage && r.artist === s.artist && r.day === s.day
-    ).length
+    // Sort active by number of friends with 'here' status
+    const hereCountFor = (s) => Object.values(presenceMap)
+      .filter(u => u.here && u.here.stage === s.stage && u.here.artist === s.artist && u.here.day === s.day)
+      .length
 
-    active.sort((a, b) => countFor(b) - countFor(a))
-    upcoming.sort((a, b) => {
-      const aTime = new Date(`2026-04-09T00:00:00`).getTime() // placeholder, sort by start string
-      return a.start.localeCompare(b.start)
-    })
+    active.sort((a, b) => hereCountFor(b) - hereCountFor(a))
+    upcoming.sort((a, b) => a.start.localeCompare(b.start))
 
     return { activeSets: active, upcomingSets: upcoming }
   }, [presenceMap])
 
-  // My status pill
-  const myStatusPill = useMemo(() => {
-    if (!myPresence) return null
-    if (myPresence.status === 'break') {
-      return (
-        <div style={pillStyle('#78350f20', '#f59e0b')}>
+  // My status pills — can show both here and going simultaneously
+  const myStatusPills = useMemo(() => {
+    const pills = []
+    const { here, going } = myPresence
+
+    if (here?.status === 'break') {
+      pills.push(
+        <div key="break" style={pillStyle('#78350f20', '#f59e0b')}>
           <span>☕</span>
-          <span>On break{myPresence.break_note ? ` · ${myPresence.break_note}` : ''}</span>
+          <span>On break{here.break_note ? ` · ${here.break_note}` : ''}</span>
+        </div>
+      )
+    } else if (here?.status === 'here') {
+      pills.push(
+        <div key="here" style={pillStyle('#14532d20', '#22c55e')}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', flexShrink: 0 }} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>At: <strong>{here.artist}</strong></span>
         </div>
       )
     }
-    if (myPresence.status === 'here') {
-      return (
-        <div style={pillStyle('#14532d20', '#22c55e')}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-          <span>At: <strong>{myPresence.artist}</strong></span>
+
+    if (going) {
+      pills.push(
+        <div key="going" style={pillStyle('#1e3a8a20', '#60a5fa')}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', display: 'inline-block', flexShrink: 0 }} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Going to: <strong>{going.artist}</strong></span>
         </div>
       )
     }
-    if (myPresence.status === 'going') {
-      return (
-        <div style={pillStyle('#1e3a8a20', '#60a5fa')}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />
-          <span>Going to: <strong>{myPresence.artist}</strong></span>
-        </div>
-      )
-    }
-    return null
+
+    return pills
   }, [myPresence])
 
   const isEmpty = activeSets.length === 0 && upcomingSets.length === 0
@@ -82,8 +87,10 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
         </div>
       </div>
 
-      {myStatusPill && (
-        <div style={{ padding: '0 16px 12px' }}>{myStatusPill}</div>
+      {myStatusPills.length > 0 && (
+        <div style={{ padding: '0 16px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {myStatusPills}
+        </div>
       )}
 
       {isEmpty && (
@@ -102,9 +109,8 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
               key={`${set.day}-${set.stage}-${set.artist}-${i}`}
               set={set}
               day={set.day}
-              presenceMap={presenceMap}
+              attendees={getSlotRows(set.stage, set.artist, set.day, 'here')}
               profiles={profiles}
-              currentUserId={currentUserId}
               onTap={() => setSheet({ set, day: set.day })}
               variant="active"
             />
@@ -120,9 +126,8 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
               key={`${set.day}-${set.stage}-${set.artist}-${i}`}
               set={set}
               day={set.day}
-              presenceMap={presenceMap}
+              attendees={getSlotRows(set.stage, set.artist, set.day, 'going')}
               profiles={profiles}
-              currentUserId={currentUserId}
               onTap={() => setSheet({ set, day: set.day })}
               variant="upcoming"
             />
@@ -160,11 +165,7 @@ function SectionHeader({ label }) {
   )
 }
 
-function SetCard({ set, day, presenceMap, profiles, currentUserId, onTap, variant }) {
-  const attendees = Object.values(presenceMap).filter(
-    r => r.stage === set.stage && r.artist === set.artist && r.day === day
-  )
-
+function SetCard({ set, day, attendees, profiles, onTap, variant }) {
   const borderColor = variant === 'active' ? '#22c55e' : '#3b82f6'
 
   return (
@@ -180,7 +181,6 @@ function SetCard({ set, day, presenceMap, profiles, currentUserId, onTap, varian
         display: 'flex',
         alignItems: 'flex-start',
         gap: 12,
-        transition: 'background 0.1s',
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -192,9 +192,9 @@ function SetCard({ set, day, presenceMap, profiles, currentUserId, onTap, varian
         </div>
       </div>
       {attendees.length > 0 && (
-        <div style={{ display: 'flex', gap: -4, flexShrink: 0 }}>
-          {attendees.map(row => (
-            <div key={row.user_id} style={{ marginLeft: attendees.indexOf(row) > 0 ? -6 : 0 }}>
+        <div style={{ display: 'flex', flexShrink: 0 }}>
+          {attendees.map((row, idx) => (
+            <div key={row.user_id} style={{ marginLeft: idx > 0 ? -6 : 0 }}>
               <UserDot
                 userId={row.user_id}
                 displayName={profiles[row.user_id]?.display_name || '?'}
@@ -221,7 +221,5 @@ function pillStyle(bg, color) {
     color,
     maxWidth: '100%',
     overflow: 'hidden',
-    whiteSpace: 'nowrap',
-    textOverflow: 'ellipsis',
   }
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { schedule, parseSetTime, isSetActive, isSetUpcoming } from '../data/schedule'
+import { schedule, parseSetTime } from '../data/schedule'
 
 // Derive consistent color index from UUID
 export function getUserColorIndex(userId) {
@@ -21,9 +21,27 @@ export const USER_COLORS = [
   { bg: '#14b8a6', text: '#fff' },  // teal
 ]
 
+// 'going' gets its own slot; 'here' and 'break' share the 'here' slot
+function slotFor(status) {
+  return status === 'going' ? 'going' : 'here'
+}
+
+function buildPresenceMap(rows) {
+  const map = {}
+  rows.forEach(row => {
+    if (!map[row.user_id]) map[row.user_id] = { here: null, going: null }
+    map[row.user_id][slotFor(row.status)] = row
+  })
+  return map
+}
+
+// presenceMap shape: { [userId]: { here: row|null, going: row|null } }
+// 'here' slot holds status='here' OR status='break'
+// 'going' slot holds status='going'
+
 export function usePresence(currentUserId) {
-  const [presenceMap, setPresenceMap] = useState({}) // userId -> presence row
-  const [profiles, setProfiles] = useState({})        // userId -> profile row
+  const [presenceMap, setPresenceMap] = useState({})
+  const [profiles, setProfiles] = useState({})
   const channelRef = useRef(null)
 
   // Load all profiles once
@@ -40,11 +58,7 @@ export function usePresence(currentUserId) {
   // Load all presence rows
   const loadPresence = useCallback(async () => {
     const { data } = await supabase.from('presence').select('*')
-    if (data) {
-      const map = {}
-      data.forEach(row => { map[row.user_id] = row })
-      setPresenceMap(map)
-    }
+    if (data) setPresenceMap(buildPresenceMap(data))
   }, [])
 
   useEffect(() => {
@@ -60,9 +74,16 @@ export function usePresence(currentUserId) {
         setPresenceMap(prev => {
           const next = { ...prev }
           if (eventType === 'DELETE') {
-            delete next[oldRow.user_id]
+            const uid = oldRow.user_id
+            const slot = slotFor(oldRow.status)
+            if (next[uid]) {
+              next[uid] = { ...next[uid], [slot]: null }
+              if (!next[uid].here && !next[uid].going) delete next[uid]
+            }
           } else {
-            next[newRow.user_id] = newRow
+            const uid = newRow.user_id
+            const slot = slotFor(newRow.status)
+            next[uid] = { ...(next[uid] || { here: null, going: null }), [slot]: newRow }
           }
           return next
         })
@@ -76,28 +97,38 @@ export function usePresence(currentUserId) {
   // Stale "going" cleanup — run on mount and every 60s
   const cleanupStaleGoing = useCallback(async () => {
     const now = new Date()
-    const staleIds = []
+    const staleUserIds = []
 
-    Object.values(presenceMap).forEach(row => {
-      if (row.status !== 'going') return
+    Object.entries(presenceMap).forEach(([userId, userPresence]) => {
+      const row = userPresence.going
+      if (!row) return
       const daySchedule = schedule[row.day]
       if (!daySchedule) return
       for (const stageObj of daySchedule) {
         for (const set of stageObj.sets) {
           if (set.artist === row.artist && stageObj.stage === row.stage) {
             const start = parseSetTime(set.start, row.day)
-            if (now >= start) staleIds.push(row.user_id)
+            if (now >= start) staleUserIds.push(userId)
           }
         }
       }
     })
 
-    if (staleIds.length === 0) return
+    if (staleUserIds.length === 0) return
 
-    await supabase.from('presence').delete().in('user_id', staleIds)
+    await supabase.from('presence')
+      .delete()
+      .in('user_id', staleUserIds)
+      .eq('status', 'going')
+
     setPresenceMap(prev => {
       const next = { ...prev }
-      staleIds.forEach(id => delete next[id])
+      staleUserIds.forEach(uid => {
+        if (next[uid]) {
+          next[uid] = { ...next[uid], going: null }
+          if (!next[uid].here && !next[uid].going) delete next[uid]
+        }
+      })
       return next
     })
   }, [presenceMap])
@@ -108,57 +139,83 @@ export function usePresence(currentUserId) {
     return () => clearInterval(interval)
   }, [cleanupStaleGoing])
 
-  // Upsert own presence
-  const setStatus = useCallback(async ({ day, stage, artist, start_time, end_time, status, break_note = null }) => {
+  // Upsert a here or going status for a specific set
+  const setStatus = useCallback(async ({ day, stage, artist, start_time, end_time, status }) => {
     if (!currentUserId) return
-
-    const row = { user_id: currentUserId, day, stage, artist, start_time, end_time, status, break_note, updated_at: new Date().toISOString() }
-
+    const row = {
+      user_id: currentUserId,
+      day, stage, artist, start_time, end_time,
+      status,
+      break_note: null,
+      updated_at: new Date().toISOString(),
+    }
+    const slot = slotFor(status)
     // Optimistic update
-    setPresenceMap(prev => ({ ...prev, [currentUserId]: row }))
-
-    await supabase.from('presence').upsert(row, { onConflict: 'user_id' })
+    setPresenceMap(prev => ({
+      ...prev,
+      [currentUserId]: { ...(prev[currentUserId] || { here: null, going: null }), [slot]: row },
+    }))
+    await supabase.from('presence').upsert(row, { onConflict: 'user_id,status' })
   }, [currentUserId])
 
-  // Clear own presence
-  const clearStatus = useCallback(async () => {
+  // Delete a single status row for the current user
+  const clearStatus = useCallback(async (status) => {
     if (!currentUserId) return
-
+    const slot = slotFor(status)
     // Optimistic update
     setPresenceMap(prev => {
+      const updated = { ...(prev[currentUserId] || { here: null, going: null }), [slot]: null }
       const next = { ...prev }
-      delete next[currentUserId]
+      if (!updated.here && !updated.going) {
+        delete next[currentUserId]
+      } else {
+        next[currentUserId] = updated
+      }
       return next
     })
-
-    await supabase.from('presence').delete().eq('user_id', currentUserId)
+    await supabase.from('presence')
+      .delete()
+      .eq('user_id', currentUserId)
+      .eq('status', status)
   }, [currentUserId])
 
-  // Set break status
+  // Set break — replaces the here slot, leaves going untouched
   const setBreak = useCallback(async (breakNote = '') => {
     if (!currentUserId) return
     const row = {
       user_id: currentUserId,
-      day: null,
-      stage: null,
-      artist: null,
-      start_time: null,
-      end_time: null,
+      day: null, stage: null, artist: null,
+      start_time: null, end_time: null,
       status: 'break',
       break_note: breakNote || null,
       updated_at: new Date().toISOString(),
     }
-    setPresenceMap(prev => ({ ...prev, [currentUserId]: row }))
-    await supabase.from('presence').upsert(row, { onConflict: 'user_id' })
+    // Optimistic: replace here slot with break row
+    setPresenceMap(prev => ({
+      ...prev,
+      [currentUserId]: { ...(prev[currentUserId] || { here: null, going: null }), here: row },
+    }))
+    // Delete any existing 'here' row first, then upsert 'break'
+    await supabase.from('presence').delete().eq('user_id', currentUserId).eq('status', 'here')
+    await supabase.from('presence').upsert(row, { onConflict: 'user_id,status' })
   }, [currentUserId])
 
-  const myPresence = presenceMap[currentUserId] || null
+  const myPresence = presenceMap[currentUserId] || { here: null, going: null }
 
-  // Get presence users for a specific set
-  const getSetPresence = useCallback((stage, artist, day) => {
-    return Object.values(presenceMap).filter(row =>
-      row.stage === stage && row.artist === artist && row.day === day
-    )
+  // Get all presence rows for a specific set, optionally filtered by status slot
+  // statusFilter: 'here' | 'going' | undefined (both)
+  const getSetPresence = useCallback((stage, artist, day, statusFilter) => {
+    const results = []
+    Object.entries(presenceMap).forEach(([userId, userPresence]) => {
+      const slots = statusFilter ? [statusFilter] : ['here', 'going']
+      slots.forEach(slot => {
+        const row = userPresence[slot]
+        if (row && row.stage === stage && row.artist === artist && row.day === day) {
+          results.push(row)
+        }
+      })
+    })
+    return results
   }, [presenceMap])
 
   return {

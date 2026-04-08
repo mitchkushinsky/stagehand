@@ -115,8 +115,9 @@ function SetRow({ set, stage, day, presenceMap, profiles, currentUserId, onTap }
   const active = isSetActive(set, day)
   const upcoming = isSetUpcoming(set, day)
 
-  const attendees = Object.values(presenceMap).filter(
-    r => r.stage === stage && r.artist === set.artist && r.day === day
+  // Collect both 'here' and 'going' rows for this set
+  const attendees = Object.values(presenceMap).flatMap(u =>
+    [u.here, u.going].filter(r => r && r.stage === stage && r.artist === set.artist && r.day === day)
   )
 
   let leftBorderColor = 'transparent'
