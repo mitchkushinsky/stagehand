@@ -53,9 +53,17 @@ export function usePresence(currentUserId) {
     }
   }, [])
 
-  // Load all profiles once
+  // Load all profiles once, then subscribe for realtime inserts/updates
   useEffect(() => {
     loadProfiles()
+
+    const channel = supabase
+      .channel('profiles-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, loadProfiles)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, loadProfiles)
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [loadProfiles])
 
   // Load all presence rows
