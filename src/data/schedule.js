@@ -480,6 +480,22 @@ const DATE_MAP = {
   sunday: '2026-04-12',
 }
 
+// Set both to null before the festival.
+export const DEV_DATE_OVERRIDE = '2026-04-09' // e.g. '2026-04-09'
+export const DEV_TIME_OVERRIDE = '14:00'       // e.g. '14:00' (24-hour)
+
+function getNow() {
+  if (DEV_DATE_OVERRIDE && DEV_TIME_OVERRIDE) {
+    return new Date(`${DEV_DATE_OVERRIDE}T${DEV_TIME_OVERRIDE}:00`)
+  }
+  if (DEV_DATE_OVERRIDE) {
+    const real = new Date()
+    const time = `${String(real.getHours()).padStart(2,'0')}:${String(real.getMinutes()).padStart(2,'0')}`
+    return new Date(`${DEV_DATE_OVERRIDE}T${time}:${String(real.getSeconds()).padStart(2,'0')}`)
+  }
+  return new Date()
+}
+
 export function parseSetTime(timeStr, day) {
   const [time, meridiem] = timeStr.split(' ')
   let [hours, minutes] = time.split(':').map(Number)
@@ -489,26 +505,26 @@ export function parseSetTime(timeStr, day) {
 }
 
 export function isSetActive(set, day) {
-  const now = new Date()
+  const now = getNow()
   const start = parseSetTime(set.start, day)
   const end = parseSetTime(set.end, day)
   return now >= start && now <= end
 }
 
 export function isSetUpcoming(set, day, hoursAhead = 4) {
-  const now = new Date()
+  const now = getNow()
   const start = parseSetTime(set.start, day)
   return start > now && start <= new Date(now.getTime() + hoursAhead * 60 * 60 * 1000)
 }
 
 export function isSetPast(set, day) {
-  const now = new Date()
+  const now = getNow()
   const end = parseSetTime(set.end, day)
   return now > end
 }
 
 export function getTodayKey() {
-  const today = new Date().toISOString().split('T')[0]
+  const today = getNow().toISOString().split('T')[0]
   const map = {
     '2026-04-09': 'thursday',
     '2026-04-10': 'friday',
