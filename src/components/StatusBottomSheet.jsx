@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
-import { isSetActive, isSetUpcoming } from '../data/schedule'
+import { isSetActive, isSetPast } from '../data/schedule'
 
 export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, onSetBreak, onClear, onClose }) {
   const [breakNote, setBreakNote] = useState('')
   const [showBreakInput, setShowBreakInput] = useState(false)
-  const [replacing, setReplacing] = useState(false)
   const overlayRef = useRef(null)
   const sheetRef = useRef(null)
 
   const active = isSetActive(set, day)
-  const upcoming = isSetUpcoming(set, day)
+  const past = isSetPast(set, day)
+  // "Going" is available for any set that hasn't started yet (no 4-hour gate here)
+  const canGo = !active && !past
 
   const isMyCurrentSet = myPresence &&
     myPresence.artist === set.artist &&
@@ -121,23 +122,21 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
 
         {/* Buttons */}
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {active && (
-            <button
-              onClick={handleHere}
-              style={{
-                ...btnStyle,
-                background: isMyCurrentSet && myPresence.status === 'here' ? '#16a34a' : '#15803d20',
-                border: '1.5px solid #22c55e60',
-                color: '#22c55e',
-                outline: isMyCurrentSet && myPresence.status === 'here' ? '2px solid #22c55e' : 'none',
-              }}
-            >
-              <span style={{ fontSize: 18 }}>🟢</span>
-              {isMyCurrentSet && myPresence.status === 'here' ? "Here now ✓" : "I'm Here"}
-            </button>
-          )}
+          <button
+            onClick={handleHere}
+            style={{
+              ...btnStyle,
+              background: isMyCurrentSet && myPresence.status === 'here' ? '#16a34a' : '#15803d20',
+              border: '1.5px solid #22c55e60',
+              color: '#22c55e',
+              outline: isMyCurrentSet && myPresence.status === 'here' ? '2px solid #22c55e' : 'none',
+            }}
+          >
+            <span style={{ fontSize: 18 }}>🟢</span>
+            {isMyCurrentSet && myPresence.status === 'here' ? "Here now ✓" : "I'm Here"}
+          </button>
 
-          {upcoming && !active && (
+          {canGo && (
             <button
               onClick={handleGoing}
               style={{
