@@ -147,6 +147,8 @@ export function usePresence(currentUserId) {
       day, stage, artist, start_time, end_time,
       status,
       break_note: null,
+      here_note: null,
+      here_reaction: null,
       updated_at: new Date().toISOString(),
     }
     const slot = slotFor(status)
@@ -204,6 +206,24 @@ export function usePresence(currentUserId) {
     await supabase.from('presence').upsert(row, { onConflict: 'user_id,status' })
   }, [currentUserId])
 
+  // Save reaction + note on an existing 'here' row without changing any other fields
+  const saveHereAnnotation = useCallback(async ({ reaction, note }) => {
+    if (!currentUserId) return
+    const currentHere = presenceMap[currentUserId]?.here
+    if (!currentHere || currentHere.status !== 'here') return
+    const row = {
+      ...currentHere,
+      here_reaction: reaction || null,
+      here_note: note || null,
+      updated_at: new Date().toISOString(),
+    }
+    setPresenceMap(prev => ({
+      ...prev,
+      [currentUserId]: { ...(prev[currentUserId] || { here: null, going: null }), here: row },
+    }))
+    await supabase.from('presence').upsert(row, { onConflict: 'user_id,status' })
+  }, [currentUserId, presenceMap])
+
   const myPresence = presenceMap[currentUserId] || { here: null, going: null }
 
   // Get all presence rows for a specific set, optionally filtered by status slot
@@ -229,6 +249,7 @@ export function usePresence(currentUserId) {
     setStatus,
     clearStatus,
     setBreak,
+    saveHereAnnotation,
     getSetPresence,
     getUserColor: (userId) => USER_COLORS[getUserColorIndex(userId)],
   }

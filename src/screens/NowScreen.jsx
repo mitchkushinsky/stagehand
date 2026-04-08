@@ -4,7 +4,7 @@ import UserDot from '../components/UserDot'
 import DotRow from '../components/DotRow'
 import StatusBottomSheet from '../components/StatusBottomSheet'
 
-export default function NowScreen({ myPresence, presenceMap, profiles, onSetStatus, onSetBreak, onClear, currentUserId }) {
+export default function NowScreen({ myPresence, presenceMap, profiles, onSetStatus, onSetBreak, onClear, onSaveHereAnnotation, currentUserId }) {
   const [sheet, setSheet] = useState(null)
   const [pillSheet, setPillSheet] = useState(null) // 'here' | 'going' | 'break'
   const [breakExpanded, setBreakExpanded] = useState(false)
@@ -198,6 +198,7 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
           goingRow={going}
           onSetBreak={onSetBreak}
           onClear={onClear}
+          onSaveHereAnnotation={onSaveHereAnnotation}
           onClose={() => setPillSheet(null)}
         />
       )}
@@ -205,10 +206,21 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
   )
 }
 
+const REACTIONS = [
+  { emoji: '🕺', label: 'Dancing' },
+  { emoji: '🎵', label: 'Vibing' },
+  { emoji: '❤️', label: 'Loving it' },
+  { emoji: '😐', label: 'Meh' },
+  { emoji: '📍', label: 'Up front' },
+]
+
 // Slide-up sheet opened by tapping a status pill
-function PillSheet({ type, hereRow, goingRow, onSetBreak, onClear, onClose }) {
+function PillSheet({ type, hereRow, goingRow, onSetBreak, onClear, onSaveHereAnnotation, onClose }) {
   const [breakNote, setBreakNote] = useState(type === 'break' ? (hereRow?.break_note || '') : '')
   const [showBreakExpanded, setShowBreakExpanded] = useState(false)
+  // here annotation state — pre-populated from existing row
+  const [reaction, setReaction] = useState(hereRow?.here_reaction || null)
+  const [hereNote, setHereNote] = useState(hereRow?.here_note || '')
   const overlayRef = useRef(null)
   const sheetRef = useRef(null)
 
@@ -229,6 +241,11 @@ function PillSheet({ type, hereRow, goingRow, onSetBreak, onClear, onClose }) {
 
   function handleOverlayClick(e) {
     if (e.target === overlayRef.current) handleClose()
+  }
+
+  async function handleSaveAnnotation() {
+    await onSaveHereAnnotation({ reaction, note: hereNote })
+    handleClose()
   }
 
   async function handleGoOnBreak() {
@@ -283,62 +300,99 @@ function PillSheet({ type, hereRow, goingRow, onSetBreak, onClear, onClose }) {
         </div>
 
         {/* Header */}
-        <div style={{ padding: '12px 20px 16px' }}>
+        <div style={{ padding: '12px 20px 14px' }}>
           <div style={{ fontSize: 20, fontWeight: 700, color: '#eaeaea', lineHeight: 1.2 }}>
             {type === 'break' ? 'On break' : row?.artist}
           </div>
           {type !== 'break' && row?.stage && (
-            <div style={{ fontSize: 14, color: '#8892a4', marginTop: 4 }}>
-              {row.stage}
-            </div>
+            <div style={{ fontSize: 14, color: '#8892a4', marginTop: 4 }}>{row.stage}</div>
           )}
         </div>
 
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-          {/* HERE pill sheet */}
-          {type === 'here' && !showBreakExpanded && (
-            <button
-              onClick={() => setShowBreakExpanded(true)}
-              style={{ ...actionBtnStyle, background: '#78350f20', border: '1.5px solid #f59e0b60', color: '#fbbf24' }}
-            >
-              <span style={{ fontSize: 18 }}>☕</span>
-              Go on break
-            </button>
-          )}
-          {type === 'here' && showBreakExpanded && (
-            <div style={{ border: '1.5px solid #f59e0b60', borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ ...actionBtnStyle, background: '#92400e20', color: '#fbbf24', borderRadius: 0, cursor: 'default' }}>
-                <span style={{ fontSize: 18 }}>☕</span>
-                Go on break
-              </div>
-              <div style={{ padding: '8px 12px 12px', background: '#0f1f3d' }}>
-                <input
-                  autoFocus
-                  value={breakNote}
-                  onChange={e => setBreakNote(e.target.value)}
-                  placeholder="Optional note (e.g. grabbing food, back at 3)"
-                  maxLength={80}
-                  style={noteInputStyle}
-                  onKeyDown={e => { if (e.key === 'Enter') handleGoOnBreak() }}
-                />
-                <button onClick={handleGoOnBreak} style={confirmBtnStyle('#92400e', '#fbbf24')}>
-                  Set Break Status
-                </button>
-              </div>
-            </div>
-          )}
+          {/* HERE pill sheet — reaction + note + save, then divider, then break + clear */}
           {type === 'here' && (
-            <button onClick={handleClearHere} style={clearBtnStyle}>
-              Clear status
-            </button>
+            <>
+              {/* Reaction row */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                {REACTIONS.map(r => (
+                  <button
+                    key={r.emoji}
+                    onClick={() => setReaction(prev => prev === r.emoji ? null : r.emoji)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 4px',
+                      fontSize: 22,
+                      background: reaction === r.emoji ? '#1e3a5f' : '#0d1b38',
+                      border: reaction === r.emoji ? '1.5px solid #3b82f6' : '1.5px solid rgba(255,255,255,0.08)',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      transition: 'border-color 0.15s, background 0.15s',
+                    }}
+                  >
+                    {r.emoji}
+                  </button>
+                ))}
+              </div>
+
+              {/* Note input */}
+              <input
+                value={hereNote}
+                onChange={e => setHereNote(e.target.value)}
+                placeholder="Where are you standing? (optional)"
+                maxLength={80}
+                style={noteInputStyle}
+                onKeyDown={e => { if (e.key === 'Enter') handleSaveAnnotation() }}
+              />
+
+              {/* Save button */}
+              <button onClick={handleSaveAnnotation} style={confirmBtnStyle('#1d4ed8', '#93c5fd')}>
+                Save
+              </button>
+
+              {/* Divider */}
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '2px 0' }} />
+
+              {/* Go on break */}
+              {!showBreakExpanded ? (
+                <button
+                  onClick={() => setShowBreakExpanded(true)}
+                  style={{ ...actionBtnStyle, background: '#78350f20', border: '1.5px solid #f59e0b60', color: '#fbbf24' }}
+                >
+                  <span style={{ fontSize: 18 }}>☕</span>
+                  Go on break
+                </button>
+              ) : (
+                <div style={{ border: '1.5px solid #f59e0b60', borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ ...actionBtnStyle, background: '#92400e20', color: '#fbbf24', borderRadius: 0, cursor: 'default' }}>
+                    <span style={{ fontSize: 18 }}>☕</span>
+                    Go on break
+                  </div>
+                  <div style={{ padding: '8px 12px 12px', background: '#0f1f3d' }}>
+                    <input
+                      autoFocus
+                      value={breakNote}
+                      onChange={e => setBreakNote(e.target.value)}
+                      placeholder="Optional note (e.g. grabbing food, back at 3)"
+                      maxLength={80}
+                      style={noteInputStyle}
+                      onKeyDown={e => { if (e.key === 'Enter') handleGoOnBreak() }}
+                    />
+                    <button onClick={handleGoOnBreak} style={confirmBtnStyle('#92400e', '#fbbf24')}>
+                      Set Break Status
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <button onClick={handleClearHere} style={clearBtnStyle}>Clear status</button>
+            </>
           )}
 
           {/* GOING pill sheet */}
           {type === 'going' && (
-            <button onClick={handleClearGoing} style={clearBtnStyle}>
-              Clear status
-            </button>
+            <button onClick={handleClearGoing} style={clearBtnStyle}>Clear status</button>
           )}
 
           {/* BREAK pill sheet */}
@@ -355,9 +409,7 @@ function PillSheet({ type, hereRow, goingRow, onSetBreak, onClear, onClose }) {
               <button onClick={handleUpdateBreak} style={confirmBtnStyle('#92400e', '#fbbf24')}>
                 Update note
               </button>
-              <button onClick={handleClearBreak} style={clearBtnStyle}>
-                Clear break
-              </button>
+              <button onClick={handleClearBreak} style={clearBtnStyle}>Clear break</button>
             </>
           )}
         </div>

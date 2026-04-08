@@ -13,7 +13,7 @@ export default function App() {
   const [tab, setTab] = useState('now')
 
   const currentUserId = session?.user?.id || null
-  const { presenceMap, profiles, myPresence, setStatus, clearStatus, setBreak } = usePresence(currentUserId)
+  const { presenceMap, profiles, myPresence, setStatus, clearStatus, setBreak, saveHereAnnotation } = usePresence(currentUserId)
 
   if (loading) {
     return (
@@ -51,7 +51,8 @@ export default function App() {
     profiles,
     onSetStatus: handleSetStatus,
     onSetBreak: setBreak,
-    onClear: clearStatus,  // clearStatus(status) — deletes one row by status
+    onClear: clearStatus,
+    onSaveHereAnnotation: saveHereAnnotation,
     currentUserId,
   }
 
