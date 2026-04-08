@@ -13,7 +13,7 @@ function primarySortKey(userPresence) {
   return 3
 }
 
-export default function CrewScreen({ myPresence, presenceMap, profiles, onSetStatus, onSetBreak, onClear, currentUserId }) {
+export default function CrewScreen({ myPresence, presenceMap, profiles, onSetStatus, onClear, currentUserId }) {
   const [sheet, setSheet] = useState(null)
 
   const crewList = useMemo(() => {
@@ -71,7 +71,6 @@ export default function CrewScreen({ myPresence, presenceMap, profiles, onSetSta
           day={sheet.day}
           myPresence={myPresence}
           onSetStatus={({ status }) => onSetStatus({ ...sheet.set, day: sheet.day, status })}
-          onSetBreak={onSetBreak}
           onClear={onClear}
           onClose={() => setSheet(null)}
         />

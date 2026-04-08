@@ -5,10 +5,9 @@ import StatusBottomSheet from '../components/StatusBottomSheet'
 
 export default function NowScreen({ myPresence, presenceMap, profiles, onSetStatus, onSetBreak, onClear, currentUserId }) {
   const [sheet, setSheet] = useState(null)
-  const [breakSheet, setBreakSheet] = useState(false)
+  const [pillSheet, setPillSheet] = useState(null) // 'here' | 'going' | 'break'
   const todayKey = getTodayKey()
 
-  // Helper: get rows for a set filtered by slot ('here' or 'going'), excluding break status
   function getSlotRows(stage, artist, day, slot) {
     return Object.values(presenceMap)
       .map(u => u[slot])
@@ -40,7 +39,6 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
     return { activeSets: active, upcomingSets: upcoming }
   }, [presenceMap])
 
-  // People on break
   const onBreak = useMemo(() =>
     Object.entries(presenceMap)
       .filter(([, u]) => u.here?.status === 'break')
@@ -48,40 +46,7 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
     [presenceMap]
   )
 
-  // My status pills
-  const myStatusPills = useMemo(() => {
-    const pills = []
-    const { here, going } = myPresence
-
-    if (here?.status === 'break') {
-      pills.push(
-        <div key="break" style={pillStyle('#78350f20', '#f59e0b')}>
-          <span>☕</span>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            On break{here.break_note ? ` · ${here.break_note}` : ''}
-          </span>
-        </div>
-      )
-    } else if (here?.status === 'here') {
-      pills.push(
-        <div key="here" style={pillStyle('#14532d20', '#22c55e')}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', flexShrink: 0 }} />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>At: <strong>{here.artist}</strong></span>
-        </div>
-      )
-    }
-
-    if (going) {
-      pills.push(
-        <div key="going" style={pillStyle('#1e3a8a20', '#60a5fa')}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', display: 'inline-block', flexShrink: 0 }} />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Going to: <strong>{going.artist}</strong></span>
-        </div>
-      )
-    }
-
-    return pills
-  }, [myPresence])
+  const { here, going } = myPresence
 
   const isEmpty = activeSets.length === 0 && upcomingSets.length === 0
 
@@ -97,47 +62,39 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
         </div>
       </div>
 
-      {/* My status pills */}
-      {myStatusPills.length > 0 && (
-        <div style={{ padding: '0 16px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {myStatusPills}
+      {/* Interactive status pills */}
+      {(here || going) && (
+        <div style={{ padding: '0 16px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {here?.status === 'break' && (
+            <button onClick={() => setPillSheet('break')} style={pillBtnStyle('#78350f20', '#f59e0b')}>
+              <span>☕</span>
+              <span style={pillTextStyle}>On break{here.break_note ? ` · ${here.break_note}` : ''}</span>
+              <ChevronIcon />
+            </button>
+          )}
+          {here?.status === 'here' && (
+            <button onClick={() => setPillSheet('here')} style={pillBtnStyle('#14532d20', '#22c55e')}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', flexShrink: 0 }} />
+              <span style={pillTextStyle}>At: <strong>{here.artist}</strong></span>
+              <ChevronIcon />
+            </button>
+          )}
+          {going && (
+            <button onClick={() => setPillSheet('going')} style={pillBtnStyle('#1e3a8a20', '#60a5fa')}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', display: 'inline-block', flexShrink: 0 }} />
+              <span style={pillTextStyle}>Going to: <strong>{going.artist}</strong></span>
+              <ChevronIcon />
+            </button>
+          )}
         </div>
       )}
-
-      {/* I'm on break button */}
-      <div style={{ padding: '0 16px 12px' }}>
-        <button
-          onClick={() => setBreakSheet(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '9px 16px',
-            background: '#78350f18',
-            border: '1px solid #f59e0b30',
-            borderRadius: 20,
-            color: '#f59e0b',
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: 'pointer',
-            width: '100%',
-          }}
-        >
-          <span>☕</span>
-          <span>I'm on break…</span>
-        </button>
-      </div>
 
       {/* On Break section */}
       {onBreak.length > 0 && (
         <section style={{ padding: '0 16px 4px' }}>
           <div style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: 1.2,
-            color: '#8892a4',
-            textTransform: 'uppercase',
-            marginBottom: 8,
+            fontSize: 11, fontWeight: 700, letterSpacing: 1.2,
+            color: '#8892a4', textTransform: 'uppercase', marginBottom: 8,
           }}>
             On Break
           </div>
@@ -171,7 +128,6 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
             <SetCard
               key={`${set.day}-${set.stage}-${set.artist}-${i}`}
               set={set}
-              day={set.day}
               attendees={getSlotRows(set.stage, set.artist, set.day, 'here')}
               profiles={profiles}
               onTap={() => setSheet({ set, day: set.day })}
@@ -188,7 +144,6 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
             <SetCard
               key={`${set.day}-${set.stage}-${set.artist}-${i}`}
               set={set}
-              day={set.day}
               attendees={getSlotRows(set.stage, set.artist, set.day, 'going')}
               profiles={profiles}
               onTap={() => setSheet({ set, day: set.day })}
@@ -204,24 +159,29 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
           day={sheet.day}
           myPresence={myPresence}
           onSetStatus={({ status }) => onSetStatus({ ...sheet.set, day: sheet.day, status })}
-          onSetBreak={onSetBreak}
           onClear={onClear}
           onClose={() => setSheet(null)}
         />
       )}
 
-      {breakSheet && (
-        <BreakSheet
+      {pillSheet && (
+        <PillSheet
+          type={pillSheet}
+          hereRow={here}
+          goingRow={going}
           onSetBreak={onSetBreak}
-          onClose={() => setBreakSheet(false)}
+          onClear={onClear}
+          onClose={() => setPillSheet(null)}
         />
       )}
     </div>
   )
 }
 
-function BreakSheet({ onSetBreak, onClose }) {
-  const [note, setNote] = useState('')
+// Slide-up sheet opened by tapping a status pill
+function PillSheet({ type, hereRow, goingRow, onSetBreak, onClear, onClose }) {
+  const [breakNote, setBreakNote] = useState(type === 'break' ? (hereRow?.break_note || '') : '')
+  const [showBreakExpanded, setShowBreakExpanded] = useState(false)
   const overlayRef = useRef(null)
   const sheetRef = useRef(null)
 
@@ -244,79 +204,138 @@ function BreakSheet({ onSetBreak, onClose }) {
     if (e.target === overlayRef.current) handleClose()
   }
 
-  async function handleSubmit() {
-    await onSetBreak(note)
+  async function handleGoOnBreak() {
+    await onSetBreak(breakNote)
     handleClose()
   }
+
+  async function handleUpdateBreak() {
+    await onSetBreak(breakNote)
+    handleClose()
+  }
+
+  async function handleClearHere() {
+    await onClear('here')
+    handleClose()
+  }
+
+  async function handleClearGoing() {
+    await onClear('going')
+    handleClose()
+  }
+
+  async function handleClearBreak() {
+    await onClear('break')
+    handleClose()
+  }
+
+  const row = type === 'going' ? goingRow : hereRow
 
   return (
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
       style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.6)',
-        zIndex: 100,
-        display: 'flex',
-        alignItems: 'flex-end',
-        justifyContent: 'center',
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+        zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
       }}
     >
       <div
         ref={sheetRef}
         style={{
-          width: '100%',
-          maxWidth: 480,
-          background: '#16213e',
+          width: '100%', maxWidth: 480, background: '#16213e',
           borderRadius: '20px 20px 0 0',
-          padding: '0 16px env(safe-area-inset-bottom, 20px)',
+          padding: '0 0 env(safe-area-inset-bottom, 16px)',
           transform: 'translateY(100%)',
           transition: 'transform 0.22s ease-out',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 16 }}>
+        {/* Handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
           <div style={{ width: 40, height: 4, borderRadius: 2, background: '#ffffff30' }} />
         </div>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#fbbf24', marginBottom: 16 }}>
-          ☕ On Break
+
+        {/* Header */}
+        <div style={{ padding: '12px 20px 16px' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#eaeaea', lineHeight: 1.2 }}>
+            {type === 'break' ? 'On break' : row?.artist}
+          </div>
+          {type !== 'break' && row?.stage && (
+            <div style={{ fontSize: 14, color: '#8892a4', marginTop: 4 }}>
+              {row.stage}
+            </div>
+          )}
         </div>
-        <input
-          autoFocus
-          value={note}
-          onChange={e => setNote(e.target.value)}
-          placeholder="Optional note (e.g. grabbing food, back at 3)"
-          maxLength={80}
-          style={{
-            width: '100%',
-            background: '#0d1b38',
-            border: '1px solid #ffffff20',
-            borderRadius: 10,
-            padding: '12px 14px',
-            color: '#eaeaea',
-            fontSize: 15,
-            outline: 'none',
-            marginBottom: 12,
-          }}
-          onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
-        />
-        <button
-          onClick={handleSubmit}
-          style={{
-            width: '100%',
-            padding: '13px',
-            background: '#92400e',
-            border: 'none',
-            borderRadius: 10,
-            color: '#fbbf24',
-            fontWeight: 700,
-            fontSize: 15,
-            cursor: 'pointer',
-            marginBottom: 8,
-          }}
-        >
-          Set Break Status
-        </button>
+
+        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+          {/* HERE pill sheet */}
+          {type === 'here' && !showBreakExpanded && (
+            <button
+              onClick={() => setShowBreakExpanded(true)}
+              style={{ ...actionBtnStyle, background: '#78350f20', border: '1.5px solid #f59e0b60', color: '#fbbf24' }}
+            >
+              <span style={{ fontSize: 18 }}>☕</span>
+              Go on break
+            </button>
+          )}
+          {type === 'here' && showBreakExpanded && (
+            <div style={{ border: '1.5px solid #f59e0b60', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ ...actionBtnStyle, background: '#92400e20', color: '#fbbf24', borderRadius: 0, cursor: 'default' }}>
+                <span style={{ fontSize: 18 }}>☕</span>
+                Go on break
+              </div>
+              <div style={{ padding: '8px 12px 12px', background: '#0f1f3d' }}>
+                <input
+                  autoFocus
+                  value={breakNote}
+                  onChange={e => setBreakNote(e.target.value)}
+                  placeholder="Optional note (e.g. grabbing food, back at 3)"
+                  maxLength={80}
+                  style={noteInputStyle}
+                  onKeyDown={e => { if (e.key === 'Enter') handleGoOnBreak() }}
+                />
+                <button onClick={handleGoOnBreak} style={confirmBtnStyle('#92400e', '#fbbf24')}>
+                  Set Break Status
+                </button>
+              </div>
+            </div>
+          )}
+          {type === 'here' && (
+            <button onClick={handleClearHere} style={clearBtnStyle}>
+              Clear status
+            </button>
+          )}
+
+          {/* GOING pill sheet */}
+          {type === 'going' && (
+            <button onClick={handleClearGoing} style={clearBtnStyle}>
+              Clear status
+            </button>
+          )}
+
+          {/* BREAK pill sheet */}
+          {type === 'break' && (
+            <>
+              <input
+                value={breakNote}
+                onChange={e => setBreakNote(e.target.value)}
+                placeholder="Optional note (e.g. grabbing food, back at 3)"
+                maxLength={80}
+                style={noteInputStyle}
+                onKeyDown={e => { if (e.key === 'Enter') handleUpdateBreak() }}
+              />
+              <button onClick={handleUpdateBreak} style={confirmBtnStyle('#92400e', '#fbbf24')}>
+                Update note
+              </button>
+              <button onClick={handleClearBreak} style={clearBtnStyle}>
+                Clear break
+              </button>
+            </>
+          )}
+        </div>
+
+        <div style={{ height: 16 }} />
       </div>
     </div>
   )
@@ -325,34 +344,23 @@ function BreakSheet({ onSetBreak, onClose }) {
 function SectionHeader({ label }) {
   return (
     <div style={{
-      padding: '12px 16px 6px',
-      fontSize: 11,
-      fontWeight: 700,
-      letterSpacing: 1.2,
-      color: '#8892a4',
-      textTransform: 'uppercase',
+      padding: '12px 16px 6px', fontSize: 11, fontWeight: 700,
+      letterSpacing: 1.2, color: '#8892a4', textTransform: 'uppercase',
     }}>
       {label}
     </div>
   )
 }
 
-function SetCard({ set, day, attendees, profiles, onTap, variant }) {
+function SetCard({ set, attendees, profiles, onTap, variant }) {
   const borderColor = variant === 'active' ? '#22c55e' : '#3b82f6'
-
   return (
     <div
       onClick={onTap}
       style={{
-        margin: '0 12px 8px',
-        background: '#16213e',
-        borderRadius: 12,
-        padding: '14px 16px',
-        borderLeft: `3px solid ${borderColor}`,
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 12,
+        margin: '0 12px 8px', background: '#16213e', borderRadius: 12,
+        padding: '14px 16px', borderLeft: `3px solid ${borderColor}`,
+        cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 12,
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -367,11 +375,7 @@ function SetCard({ set, day, attendees, profiles, onTap, variant }) {
         <div style={{ display: 'flex', flexShrink: 0 }}>
           {attendees.map((row, idx) => (
             <div key={row.user_id} style={{ marginLeft: idx > 0 ? -6 : 0 }}>
-              <UserDot
-                userId={row.user_id}
-                displayName={profiles[row.user_id]?.display_name || '?'}
-                size={26}
-              />
+              <UserDot userId={row.user_id} displayName={profiles[row.user_id]?.display_name || '?'} size={26} />
             </div>
           ))}
         </div>
@@ -380,18 +384,53 @@ function SetCard({ set, day, attendees, profiles, onTap, variant }) {
   )
 }
 
-function pillStyle(bg, color) {
+function ChevronIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}>
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  )
+}
+
+function pillBtnStyle(bg, color) {
   return {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '8px 14px',
-    background: bg,
-    border: `1px solid ${color}40`,
-    borderRadius: 20,
-    fontSize: 13,
-    color,
-    maxWidth: '100%',
-    overflow: 'hidden',
+    display: 'flex', alignItems: 'center', gap: 8,
+    padding: '8px 12px 8px 14px',
+    background: bg, border: `1px solid ${color}40`,
+    borderRadius: 20, fontSize: 13, color,
+    cursor: 'pointer', width: '100%', textAlign: 'left',
+  }
+}
+
+const pillTextStyle = {
+  flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+}
+
+const actionBtnStyle = {
+  display: 'flex', alignItems: 'center', gap: 12,
+  width: '100%', padding: '14px 16px', borderRadius: 12,
+  fontSize: 16, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+}
+
+const clearBtnStyle = {
+  background: 'transparent', border: 'none',
+  color: '#8892a4', fontSize: 13, padding: '6px 0',
+  cursor: 'pointer', textDecoration: 'underline',
+  textAlign: 'center', width: '100%',
+}
+
+const noteInputStyle = {
+  width: '100%', background: '#16213e',
+  border: '1px solid #ffffff20', borderRadius: 8,
+  padding: '10px 12px', color: '#eaeaea', fontSize: 14, outline: 'none',
+  marginBottom: 8, display: 'block',
+}
+
+function confirmBtnStyle(bg, color) {
+  return {
+    width: '100%', padding: '11px', background: bg,
+    border: 'none', borderRadius: 8, color,
+    fontWeight: 600, fontSize: 14, cursor: 'pointer',
   }
 }

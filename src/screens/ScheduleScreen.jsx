@@ -3,7 +3,7 @@ import { schedule, DAYS, STAGE_NAMES, isSetActive, isSetUpcoming, isSetPast, get
 import UserDot from '../components/UserDot'
 import StatusBottomSheet from '../components/StatusBottomSheet'
 
-export default function ScheduleScreen({ myPresence, presenceMap, profiles, onSetStatus, onSetBreak, onClear, currentUserId }) {
+export default function ScheduleScreen({ myPresence, presenceMap, profiles, onSetStatus, onClear, currentUserId }) {
   const todayKey = getTodayKey()
   const [selectedDay, setSelectedDay] = useState(todayKey)
   const [sheet, setSheet] = useState(null)
@@ -67,7 +67,6 @@ export default function ScheduleScreen({ myPresence, presenceMap, profiles, onSe
           day={sheet.day}
           myPresence={myPresence}
           onSetStatus={({ status }) => onSetStatus({ ...sheet.set, day: sheet.day, status })}
-          onSetBreak={onSetBreak}
           onClear={onClear}
           onClose={() => setSheet(null)}
         />

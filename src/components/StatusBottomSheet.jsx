@@ -2,9 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { isSetActive, isSetPast } from '../data/schedule'
 
 // myPresence shape: { here: row|null, going: row|null }
-export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, onSetBreak, onClear, onClose }) {
-  const [breakNote, setBreakNote] = useState('')
-  const [showBreakInput, setShowBreakInput] = useState(false)
+export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, onClear, onClose }) {
   // 'confirming' tracks which button is in the two-tap confirm state: 'here' | 'going' | null
   const [confirming, setConfirming] = useState(null)
   const overlayRef = useRef(null)
@@ -90,11 +88,6 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
   async function commitGoing() {
     setConfirming(null)
     await onSetStatus({ status: 'going' })
-    handleClose()
-  }
-
-  async function handleBreakSubmit() {
-    await onSetBreak(breakNote)
     handleClose()
   }
 
@@ -214,71 +207,6 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
             </button>
           )}
 
-          {/* On Break — active sets only */}
-          {showHere && (!showBreakInput ? (
-            <button
-              onClick={() => { setConfirming(null); setShowBreakInput(true) }}
-              style={{
-                ...btnStyle,
-                background: '#78350f20',
-                border: '1.5px solid #f59e0b60',
-                color: '#fbbf24',
-              }}
-            >
-              <span style={{ fontSize: 18 }}>☕</span>
-              On Break
-            </button>
-          ) : (
-            <div style={{ border: '1.5px solid #f59e0b60', borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{
-                ...btnStyle,
-                background: '#92400e20',
-                color: '#fbbf24',
-                borderRadius: 0,
-                cursor: 'default',
-              }}>
-                <span style={{ fontSize: 18 }}>☕</span>
-                On Break
-              </div>
-              <div style={{ padding: '8px 12px 12px', background: '#0f1f3d' }}>
-                <input
-                  autoFocus
-                  value={breakNote}
-                  onChange={e => setBreakNote(e.target.value)}
-                  placeholder="Optional note (e.g. grabbing food, back at 3)"
-                  maxLength={80}
-                  style={{
-                    width: '100%',
-                    background: '#16213e',
-                    border: '1px solid #ffffff20',
-                    borderRadius: 8,
-                    padding: '10px 12px',
-                    color: '#eaeaea',
-                    fontSize: 14,
-                    outline: 'none',
-                  }}
-                  onKeyDown={e => { if (e.key === 'Enter') handleBreakSubmit() }}
-                />
-                <button
-                  onClick={handleBreakSubmit}
-                  style={{
-                    marginTop: 8,
-                    width: '100%',
-                    background: '#92400e',
-                    border: 'none',
-                    borderRadius: 8,
-                    color: '#fbbf24',
-                    fontWeight: 600,
-                    fontSize: 14,
-                    padding: '10px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Set Break Status
-                </button>
-              </div>
-            </div>
-          ))}
 
           {/* Clear link — shown if user has any status for this specific set */}
           {(hasHereForSet || hasGoingForSet) && (
