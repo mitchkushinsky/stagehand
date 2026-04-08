@@ -207,7 +207,7 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
 }
 
 const REACTIONS = [
-  { emoji: '🕺', label: 'Dancing' },
+  { emoji: '💃', label: 'Dancing' },
   { emoji: '😎', label: 'Vibing' },
   { emoji: '❤️', label: 'Love it' },
   { emoji: '😐', label: 'Meh' },
