@@ -214,8 +214,8 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
             </button>
           )}
 
-          {/* On Break — always shown */}
-          {!showBreakInput ? (
+          {/* On Break — active sets only */}
+          {showHere && (!showBreakInput ? (
             <button
               onClick={() => { setConfirming(null); setShowBreakInput(true) }}
               style={{
@@ -278,7 +278,7 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
                 </button>
               </div>
             </div>
-          )}
+          ))}
 
           {/* Clear link — shown if user has any status for this specific set */}
           {(hasHereForSet || hasGoingForSet) && (

@@ -1,17 +1,18 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { schedule, DAYS, isSetActive, isSetUpcoming, getTodayKey } from '../data/schedule'
 import UserDot from '../components/UserDot'
 import StatusBottomSheet from '../components/StatusBottomSheet'
 
 export default function NowScreen({ myPresence, presenceMap, profiles, onSetStatus, onSetBreak, onClear, currentUserId }) {
   const [sheet, setSheet] = useState(null)
+  const [breakSheet, setBreakSheet] = useState(false)
   const todayKey = getTodayKey()
 
-  // Helper: get rows for a set filtered by slot ('here' or 'going')
+  // Helper: get rows for a set filtered by slot ('here' or 'going'), excluding break status
   function getSlotRows(stage, artist, day, slot) {
     return Object.values(presenceMap)
       .map(u => u[slot])
-      .filter(r => r && r.stage === stage && r.artist === artist && r.day === day)
+      .filter(r => r && r.stage === stage && r.artist === artist && r.day === day && r.status !== 'break')
   }
 
   const { activeSets, upcomingSets } = useMemo(() => {
@@ -29,9 +30,8 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
       })
     })
 
-    // Sort active by number of friends with 'here' status
     const hereCountFor = (s) => Object.values(presenceMap)
-      .filter(u => u.here && u.here.stage === s.stage && u.here.artist === s.artist && u.here.day === s.day)
+      .filter(u => u.here?.status === 'here' && u.here.stage === s.stage && u.here.artist === s.artist && u.here.day === s.day)
       .length
 
     active.sort((a, b) => hereCountFor(b) - hereCountFor(a))
@@ -40,7 +40,15 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
     return { activeSets: active, upcomingSets: upcoming }
   }, [presenceMap])
 
-  // My status pills — can show both here and going simultaneously
+  // People on break
+  const onBreak = useMemo(() =>
+    Object.entries(presenceMap)
+      .filter(([, u]) => u.here?.status === 'break')
+      .map(([userId, u]) => ({ userId, row: u.here })),
+    [presenceMap]
+  )
+
+  // My status pills
   const myStatusPills = useMemo(() => {
     const pills = []
     const { here, going } = myPresence
@@ -49,7 +57,9 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
       pills.push(
         <div key="break" style={pillStyle('#78350f20', '#f59e0b')}>
           <span>☕</span>
-          <span>On break{here.break_note ? ` · ${here.break_note}` : ''}</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            On break{here.break_note ? ` · ${here.break_note}` : ''}
+          </span>
         </div>
       )
     } else if (here?.status === 'here') {
@@ -87,14 +97,67 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
         </div>
       </div>
 
+      {/* My status pills */}
       {myStatusPills.length > 0 && (
-        <div style={{ padding: '0 16px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ padding: '0 16px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {myStatusPills}
         </div>
       )}
 
+      {/* I'm on break button */}
+      <div style={{ padding: '0 16px 12px' }}>
+        <button
+          onClick={() => setBreakSheet(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '9px 16px',
+            background: '#78350f18',
+            border: '1px solid #f59e0b30',
+            borderRadius: 20,
+            color: '#f59e0b',
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: 'pointer',
+            width: '100%',
+          }}
+        >
+          <span>☕</span>
+          <span>I'm on break…</span>
+        </button>
+      </div>
+
+      {/* On Break section */}
+      {onBreak.length > 0 && (
+        <section style={{ padding: '0 16px 4px' }}>
+          <div style={{
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: 1.2,
+            color: '#8892a4',
+            textTransform: 'uppercase',
+            marginBottom: 8,
+          }}>
+            On Break
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {onBreak.map(({ userId, row }) => (
+              <div key={userId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <UserDot userId={userId} displayName={profiles[userId]?.display_name || '?'} size={26} />
+                {row.break_note && (
+                  <span style={{ fontSize: 12, color: '#8892a4', fontStyle: 'italic' }}>
+                    "{row.break_note}"
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {isEmpty && (
-        <div style={{ padding: '60px 24px', textAlign: 'center', color: '#8892a4' }}>
+        <div style={{ padding: '48px 24px', textAlign: 'center', color: '#8892a4' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🎷</div>
           <div style={{ fontSize: 16, fontWeight: 600, color: '#eaeaea' }}>Nothing playing right now</div>
           <div style={{ fontSize: 14, marginTop: 6 }}>Check the Schedule tab to plan ahead</div>
@@ -146,6 +209,115 @@ export default function NowScreen({ myPresence, presenceMap, profiles, onSetStat
           onClose={() => setSheet(null)}
         />
       )}
+
+      {breakSheet && (
+        <BreakSheet
+          onSetBreak={onSetBreak}
+          onClose={() => setBreakSheet(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+function BreakSheet({ onSetBreak, onClose }) {
+  const [note, setNote] = useState('')
+  const overlayRef = useRef(null)
+  const sheetRef = useRef(null)
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      if (sheetRef.current) sheetRef.current.style.transform = 'translateY(0)'
+    })
+  }, [])
+
+  function handleClose() {
+    if (sheetRef.current) {
+      sheetRef.current.style.transform = 'translateY(100%)'
+      setTimeout(onClose, 200)
+    } else {
+      onClose()
+    }
+  }
+
+  function handleOverlayClick(e) {
+    if (e.target === overlayRef.current) handleClose()
+  }
+
+  async function handleSubmit() {
+    await onSetBreak(note)
+    handleClose()
+  }
+
+  return (
+    <div
+      ref={overlayRef}
+      onClick={handleOverlayClick}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.6)',
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+      }}
+    >
+      <div
+        ref={sheetRef}
+        style={{
+          width: '100%',
+          maxWidth: 480,
+          background: '#16213e',
+          borderRadius: '20px 20px 0 0',
+          padding: '0 16px env(safe-area-inset-bottom, 20px)',
+          transform: 'translateY(100%)',
+          transition: 'transform 0.22s ease-out',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 16 }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: '#ffffff30' }} />
+        </div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#fbbf24', marginBottom: 16 }}>
+          ☕ On Break
+        </div>
+        <input
+          autoFocus
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          placeholder="Optional note (e.g. grabbing food, back at 3)"
+          maxLength={80}
+          style={{
+            width: '100%',
+            background: '#0d1b38',
+            border: '1px solid #ffffff20',
+            borderRadius: 10,
+            padding: '12px 14px',
+            color: '#eaeaea',
+            fontSize: 15,
+            outline: 'none',
+            marginBottom: 12,
+          }}
+          onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
+        />
+        <button
+          onClick={handleSubmit}
+          style={{
+            width: '100%',
+            padding: '13px',
+            background: '#92400e',
+            border: 'none',
+            borderRadius: 10,
+            color: '#fbbf24',
+            fontWeight: 700,
+            fontSize: 15,
+            cursor: 'pointer',
+            marginBottom: 8,
+          }}
+        >
+          Set Break Status
+        </button>
+      </div>
     </div>
   )
 }

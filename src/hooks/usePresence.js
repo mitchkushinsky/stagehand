@@ -150,11 +150,15 @@ export function usePresence(currentUserId) {
       updated_at: new Date().toISOString(),
     }
     const slot = slotFor(status)
-    // Optimistic update
+    // Optimistic update — also clears break if setting 'here'
     setPresenceMap(prev => ({
       ...prev,
       [currentUserId]: { ...(prev[currentUserId] || { here: null, going: null }), [slot]: row },
     }))
+    // Marking 'here' must delete any existing 'break' row (same slot, different DB key)
+    if (status === 'here') {
+      await supabase.from('presence').delete().eq('user_id', currentUserId).eq('status', 'break')
+    }
     await supabase.from('presence').upsert(row, { onConflict: 'user_id,status' })
   }, [currentUserId])
 
