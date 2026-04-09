@@ -150,6 +150,30 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
           </div>
         </div>
 
+        {/* Spotify link */}
+        <div style={{ padding: '0 20px 14px' }}>
+          <a
+            href={`https://open.spotify.com/search/${encodeURIComponent(set.artist)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              color: '#1DB954',
+              fontSize: 13,
+              textDecoration: 'none',
+              opacity: 0.85,
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#1DB954" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="12" fill="#1DB954"/>
+              <path d="M17.25 16.5a.75.75 0 01-.41-.12C14.23 14.72 10.9 14.4 6.97 15.27a.75.75 0 01-.34-1.46c4.3-.99 7.97-.63 10.93 1.31a.75.75 0 01-.41 1.38zm1.25-2.88a.94.94 0 01-.51-.15C15.12 11.6 11.2 11.1 7.42 12.12a.94.94 0 01-.44-1.83c4.26-1.13 8.63-.57 11.98 1.65a.94.94 0 01-.51 1.68zm.12-3a1.13 1.13 0 01-.58-.16C15.08 8.47 9.67 8.27 6.2 9.3a1.13 1.13 0 01-.6-2.17c4.03-1.13 10.04-.9 13.55 1.3a1.13 1.13 0 01-.58 2.09z" fill="white"/>
+            </svg>
+            Listen on Spotify
+          </a>
+        </div>
+
         {/* Buttons */}
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
