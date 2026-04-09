@@ -4,6 +4,7 @@ import { usePresence } from './hooks/usePresence'
 import SplashScreen from './components/SplashScreen'
 import DisplayNameModal from './components/DisplayNameModal'
 import BottomNav from './components/BottomNav'
+import HelpScreen from './components/HelpScreen'
 import NowScreen from './screens/NowScreen'
 import ScheduleScreen from './screens/ScheduleScreen'
 import CrewScreen from './screens/CrewScreen'
@@ -11,6 +12,7 @@ import CrewScreen from './screens/CrewScreen'
 export default function App() {
   const { session, profile, needsDisplayName, signInWithGoogle, signOut, saveDisplayName, loading } = useAuth()
   const [tab, setTab] = useState('now')
+  const [showHelp, setShowHelp] = useState(false)
 
   const currentUserId = session?.user?.id || null
   const { presenceMap, profiles, myPresence, setStatus, clearStatus, setBreak, saveHereAnnotation, refresh } = usePresence(currentUserId)
@@ -59,6 +61,8 @@ export default function App() {
 
   return (
     <>
+      {showHelp && <HelpScreen onClose={() => setShowHelp(false)} />}
+
       {needsDisplayName && (
         <DisplayNameModal onSave={saveDisplayName} />
       )}
@@ -80,6 +84,24 @@ export default function App() {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            onClick={() => setShowHelp(true)}
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: '50%',
+              color: '#8892a4',
+              fontSize: 13,
+              fontWeight: 700,
+              width: 26,
+              height: 26,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >?</button>
           {profile && (
             <span style={{ fontSize: 13, color: '#8892a4' }}>{profile.display_name}</span>
           )}
