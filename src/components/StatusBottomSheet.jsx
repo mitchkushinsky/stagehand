@@ -153,7 +153,7 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
         {/* Spotify link */}
         <div style={{ padding: '0 20px 14px' }}>
           <a
-            href={`https://open.spotify.com/search/${encodeURIComponent(set.artist)}`}
+            href={`https://open.spotify.com/search/${encodeURIComponent(set.artist)}/artists`}
             target="_blank"
             rel="noopener noreferrer"
             style={{
