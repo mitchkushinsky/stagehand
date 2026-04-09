@@ -108,6 +108,19 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
     }
   }
 
+  const openSpotify = () => {
+    const query = encodeURIComponent(set.artist)
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    if (isMobile) {
+      window.location = `spotify:search:${set.artist}`
+      setTimeout(() => {
+        window.open(`https://open.spotify.com/search/${query}/artists`, '_blank')
+      }, 1000)
+    } else {
+      window.open(`https://open.spotify.com/search/${query}/artists`, '_blank')
+    }
+  }
+
   return (
     <div
       ref={overlayRef}
@@ -153,9 +166,8 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
         {/* Spotify link */}
         <div style={{ padding: '0 20px 14px' }}>
           <a
-            href={`https://open.spotify.com/search/${encodeURIComponent(set.artist)}/artists`}
-            target="_blank"
-            rel="noopener noreferrer"
+            href="#"
+            onClick={e => { e.preventDefault(); openSpotify() }}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -164,6 +176,7 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
               fontSize: 13,
               textDecoration: 'none',
               opacity: 0.85,
+              cursor: 'pointer',
             }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="#1DB954" xmlns="http://www.w3.org/2000/svg">
