@@ -15,6 +15,7 @@ export default function HelpScreen({ onClose }) {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '14px 16px',
+        paddingTop: 'calc(env(safe-area-inset-top) + 14px)',
         background: '#0d1b38',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
         flexShrink: 0,
