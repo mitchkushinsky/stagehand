@@ -43,10 +43,10 @@ export const STAGE_NAMES = {
 }
 
 export const DAYS = {
-  thursday: { label: 'Thu', date: 'April 9' },
-  friday:   { label: 'Fri', date: 'April 10' },
-  saturday: { label: 'Sat', date: 'April 11' },
-  sunday:   { label: 'Sun', date: 'April 12' },
+  thursday: { label: 'Thu', date: 'April 16' },
+  friday:   { label: 'Fri', date: 'April 17' },
+  saturday: { label: 'Sat', date: 'April 18' },
+  sunday:   { label: 'Sun', date: 'April 19' },
 }
 
 export const schedule = {
