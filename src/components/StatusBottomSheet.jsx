@@ -114,8 +114,8 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
     if (isMobile) {
       window.location = `spotify:search:artist:${set.artist}`
       setTimeout(() => {
-        window.open(`https://open.spotify.com/search/${query}/artists`, '_blank')
-      }, 1000)
+        window.location = `https://open.spotify.com/search/${query}/artists`
+      }, 800)
     } else {
       window.open(`https://open.spotify.com/search/${query}/artists`, '_blank')
     }
