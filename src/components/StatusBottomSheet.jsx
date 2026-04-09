@@ -119,7 +119,8 @@ export default function StatusBottomSheet({ set, day, myPresence, onSetStatus, o
       }, 800)
     } else {
       // iOS and desktop — go straight to web, no URI scheme
-      window.open(`https://open.spotify.com/search/${query}/artists`, '_blank')
+      // Use ?type=artist query param (more reliable than /artists path on iOS)
+      window.open(`https://open.spotify.com/search/${query}?type=artist`, '_blank')
     }
   }
 
