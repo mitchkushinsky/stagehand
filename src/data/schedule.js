@@ -496,14 +496,14 @@ export const schedule = {
 }
 
 const DATE_MAP = {
-  thursday: '2026-04-09',
-  friday: '2026-04-10',
-  saturday: '2026-04-11',
-  sunday: '2026-04-12',
+  thursday: '2026-04-16',
+  friday: '2026-04-17',
+  saturday: '2026-04-18',
+  sunday: '2026-04-19',
 }
 
 // Set both to null before the festival.
-export const DEV_DATE_OVERRIDE = '2026-04-09' // e.g. '2026-04-09'
+export const DEV_DATE_OVERRIDE = '2026-04-16' // e.g. '2026-04-16'
 export const DEV_TIME_OVERRIDE = '14:00'       // e.g. '14:00' (24-hour)
 
 function getNow() {
@@ -548,10 +548,10 @@ export function isSetPast(set, day) {
 export function getTodayKey() {
   const today = getNow().toISOString().split('T')[0]
   const map = {
-    '2026-04-09': 'thursday',
-    '2026-04-10': 'friday',
-    '2026-04-11': 'saturday',
-    '2026-04-12': 'sunday',
+    '2026-04-16': 'thursday',
+    '2026-04-17': 'friday',
+    '2026-04-18': 'saturday',
+    '2026-04-19': 'sunday',
   }
   return map[today] || 'thursday'
 }
