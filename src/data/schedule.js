@@ -503,8 +503,8 @@ const DATE_MAP = {
 }
 
 // Set both to null before the festival.
-export const DEV_DATE_OVERRIDE = '2026-04-16' // e.g. '2026-04-16'
-export const DEV_TIME_OVERRIDE = '14:00'       // e.g. '14:00' (24-hour)
+export const DEV_DATE_OVERRIDE = null // e.g. '2026-04-16'
+export const DEV_TIME_OVERRIDE = null       // e.g. '14:00' (24-hour)
 
 function getNow() {
   if (DEV_DATE_OVERRIDE && DEV_TIME_OVERRIDE) {
